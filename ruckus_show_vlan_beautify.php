@@ -302,8 +302,6 @@ uksort($vlan, function($a, $b) {
     }
     return 0; // equal
 });
-print_r($vlan);
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -327,14 +325,72 @@ print_r($vlan);
       font-size: 1em;
       padding: 0.5em 1em;
     }
+	table {
+		width: 100%;
+	}
+	table, th, td {
+		border-collapse: collapse;
+		border: 1px solid;
+	}
+	th {
+		vertical-align: top;
+	}
+	td {
+		text-align: center;
+	}
+	/* Highlight the hovered cell */
+	td:hover {
+		background-color: #fffa9e;
+	}
+	/* Highlight the entire row */
+	tr:hover td {
+		background-color: #e1edf7;
+	}
+	/* first two rows (headers) */
+	tr:nth-child(1),tr:nth-child(2) {
+		background-color: #f0f8ff;
+	}
+	/* Untagged-column */
+	td:nth-child(2) {
+		background-color: #e3ffe0;
+	}
+	/* vlan 11-20 */
+	td:nth-child(13),td:nth-child(14),td:nth-child(15),td:nth-child(16),td:nth-child(17),td:nth-child(18),td:nth-child(19),td:nth-child(20),td:nth-child(21),td:nth-child(22) {
+		background-color: #e3ffe0;
+	}	
+	/* vlan 31-40 */
+	td:nth-child(33),td:nth-child(34),td:nth-child(35),td:nth-child(36),td:nth-child(37),td:nth-child(38),td:nth-child(39),td:nth-child(40),td:nth-child(41),td:nth-child(42) {
+		background-color: #e3ffe0;
+	}
   </style>
 </head>
 <body>
   <h1>Ruckus 'show vlan' beautifier</h1>
   <p>Paste 'show vlan' output in textbox</p>
-  <form id="beautifyForm">
-    <textarea id="vlan_output" name="vlan_output" placeholder="Paste your output here..."></textarea><br />
+  <form id="beautifyForm" method="POST">
+    <textarea id="vlan_output" name="vlan_output" placeholder="Paste your output here..."><?=@$_POST['vlan_output']?></textarea><br />
     <button type="submit">Beautify</button>
   </form>
+  <pre>
+  <?php
+  //print "    <table>\n      <tr><th>Port</th><th>Untagged</th><th>Tagged</th></tr>\n";
+  print "    <table>\n      <tr><th rowspan='2'>Port</th><th rowspan='2'>Untagged</th><th colspan='40'>Tagged</th></tr>\n";
+  print "      <tr><!--<td></td><td></td>-->";
+ 
+  for ($i = 1; $i <= 40; $i++) {
+	  print "<th>$i</th>";
+  }
+  print "      </tr>";
+  foreach ($vlan as $port => $data) {
+	  print "      <tr><td class='td-center'>$port</td><td class='td-center'>" . @implode(", ", $data['untagged']) . "</td>";
+	  //<td>" . @implode(", ", $data['tagged']) . "</td>\n";
+	  for ($i = 1; $i <= 40; $i++) {
+		  //print "i: $i, data: ".print_r($data['tagged'], true).", match: ".@in_array($i+1, $data['tagged'])."\n";
+		  $p = @in_array($i+1, $data['tagged'])?$i:"";	// only print port if its tagged
+		  print "<td>$p</td>";
+	  }
+  }
+//print "<pre>" . print_r($vlan, true) . "</pre>";
+	?>
 </body>
 </html>

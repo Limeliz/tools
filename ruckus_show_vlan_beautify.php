@@ -2,6 +2,7 @@
 
 $vlan = array();
 $current_vlan = null;
+// Example output
 $POST['vlan_output'] = 'Total PORT-VLAN entries: 40
 Maximum PORT-VLAN entries: 1024
 

@@ -1,245 +1,19 @@
 <?php
 
 $vlan = array();
+$vlan_names = array();
 $current_vlan = null;
-// Example output
-$POST['vlan_output'] = 'Total PORT-VLAN entries: 40
-Maximum PORT-VLAN entries: 1024
-
-Legend: [Stk=Stack-Id, S=Slot]
-
-PORT-VLAN 1, Name DEFAULT-VLAN, Priority level0, On
- Untagged Ports: (U1/M1)   1   2  22  34 
- Untagged Ports: (U1/M2)   1   2 
- Untagged Ports: (U1/M3)   1   2   3   4 
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 2, Name Lighting_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 3, Name AV_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 4, Name Home_Facility, Priority level0, On
- Untagged Ports: None                                             
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 5, Name Control_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 6, Name Security_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   1 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 7, Name VOIP_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   1  22  34 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 8, Name External_Facility, Priority level0, On
- Untagged Ports: (U1/M1)  45  47 
-   Tagged Ports: (U1/M1)   1   2  22  34 
- Mac-Vlan Ports: None
-     Monitoring: Disabled                                         
-PORT-VLAN 9, Name Guest_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   1   2  22  34 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 10, Name VideoDist_Facility, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 11, Name Admin_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 12, Name Lighting_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 13, Name AV_Apartment1, Priority level0, On             
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 14, Name Home_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 15, Name Control_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 16, Name Security_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 17, Name VOIP_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None                                             
-     Monitoring: Disabled
-PORT-VLAN 18, Name QSC_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 19, Name Guest_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 20, Name VideoDist_Apartment1, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 21, Name Admin_Apartment2, Priority level0, On
- Untagged Ports: (U1/M1)   3   4   5   9  17  24  25  27  29  31  33  35 
- Untagged Ports: (U1/M1)  36  37  39  42  44  46  48 
-   Tagged Ports: (U1/M2)   1 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 22, Name Lighting_Apartment2, Priority level0, On       
- Untagged Ports: (U1/M1)  13 
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 23, Name AV_Apartment2, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 24, Name Home_Apartment2, Priority level0, On
- Untagged Ports: (U1/M1)   6   8  10  12  14  15  16  18  20  26  28  30 
- Untagged Ports: (U1/M1)  32  38  40 
-   Tagged Ports: (U1/M1)   1   2   3  22  34 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 25, Name Control_Apartment2, Priority level0, On
- Untagged Ports: (U1/M1)   7  19  21  23  41  43                  
-   Tagged Ports: (U1/M1)   1   2   3  22  34 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 26, Name Security_Apartment2, Priority level0, On
- Untagged Ports: (U1/M1)  11 
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 27, Name VOIP_Apartment2, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 28, Name QSC_Apartment2, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2                                  
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 29, Name Guest_Apartment2, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   1   2   3  22  34 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 30, Name VideoDist_Apartment2, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: (U1/M1)   3 
-   Tagged Ports: (U1/M2)   1   2 
-   Tagged Ports: (U1/M3)   1   2   3   4 
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 31, Name Admin_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 32, Name Lighting_Apartment3, Priority level0, On       
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 33, Name AV_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 34, Name Home_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 35, Name Control_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 36, Name Security_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None                                             
-     Monitoring: Disabled
-PORT-VLAN 37, Name VOIP_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 38, Name QSC_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 39, Name Guest_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled
-PORT-VLAN 40, Name VideoDist_Apartment3, Priority level0, On
- Untagged Ports: None
-   Tagged Ports: None
- Mac-Vlan Ports: None
-     Monitoring: Disabled';
 
 if (!empty($_POST['vlan_output'])) {
     // Split input by newlines
     $rows = explode("\n", $_POST['vlan_output']);
     
     foreach ($rows as $row) {
-        // Check if the row starts with "PORT-VLAN "
-        if (substr($row, 0, 10) === "PORT-VLAN ") {
+        // Matches rows starting with "PORT-VLAN " and the VLAN name
+		if (preg_match('/PORT-VLAN\s(\d+),\sName\s([A-Za-z0-9\-_\[\]]+),/', $row, $matches)) {
+			$current_vlan = $matches[1];
+			$vlan_name[$matches[1]] = $matches[2];
+
             // Find position of the first comma after "PORT-VLAN "
             $commaPos = strpos($row, ",");
             if ($commaPos !== false) {
@@ -247,7 +21,8 @@ if (!empty($_POST['vlan_output'])) {
                 $current_vlan = substr($row, 10, $commaPos - 10);
                 $current_vlan = trim($current_vlan);
             }
-        } 
+			
+		}
         // Match untagged ports line
         elseif (preg_match('/\sUntagged\sPorts:\s\(U1\/M(\d+)\)\s+([\d\s]+)/', $row, $matches)) {
             $module = $matches[1];          // module number, e.g. "1"
@@ -373,24 +148,28 @@ uksort($vlan, function($a, $b) {
   </form>
   <pre>
   <?php
-  //print "    <table>\n      <tr><th>Port</th><th>Untagged</th><th>Tagged</th></tr>\n";
+//  print_r($vlan); // debugging
   print "    <table>\n      <tr><th rowspan='2'>Port</th><th rowspan='2'>Untagged</th><th colspan='40'>Tagged</th></tr>\n";
-  print "      <tr><!--<td></td><td></td>-->";
+  print "      <tr>\n";
  
   for ($i = 1; $i <= 40; $i++) {
-	  print "<th>$i</th>";
+	  print "        <th title='".@$vlan_name[$i]."'>$i</th>\n";
   }
-  print "      </tr>";
+  print "      </tr>\n";
+  
   foreach ($vlan as $port => $data) {
-	  print "      <tr><td class='td-center'>$port</td><td class='td-center'>" . @implode(", ", $data['untagged']) . "</td>";
-	  //<td>" . @implode(", ", $data['tagged']) . "</td>\n";
+	  print "      <tr>\n        <td>$port</td>\n        <td>" . @implode(", ", $data['untagged']) . "</td>\n";
 	  for ($i = 1; $i <= 40; $i++) {
-		  //print "i: $i, data: ".print_r($data['tagged'], true).", match: ".@in_array($i+1, $data['tagged'])."\n";
-		  $p = @in_array($i+1, $data['tagged'])?$i:"";	// only print port if its tagged
+		  if ($i%10==1) {
+			  print "        ";	// tabbing for new row each 10 vlan
+		  }
+		  $p = @in_array($i, $data['tagged'])?$i:"";	// only print port if its tagged
 		  print "<td>$p</td>";
+		  if ($i%10==0) {
+			  print "\n";	// new row each 10 vlan
+		  }
 	  }
   }
-//print "<pre>" . print_r($vlan, true) . "</pre>";
 	?>
 </body>
 </html>

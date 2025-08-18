@@ -1,0 +1,5 @@
+Download Nmap from https://nmap.org/download.html#windows
+Install.
+To listen to port 1234, run command:
+"C:\Program Files (x86)\Nmap\ncat.exe" -k -l 0.0.0.0 1234
+It will only show incoming requests, not reply.

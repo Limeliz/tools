@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Traffic Sandbox</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside id="panel">
+    <header>
+      <h1>Traffic Sandbox</h1>
+      <p class="sub">Cars, junctions and drivers in a small town grid</p>
+    </header>
+
+    <section>
+      <h2>Simulation</h2>
+      <div class="row">
+        <button id="btnPlay" class="primary" title="Space">Pause</button>
+        <label class="inline">Speed
+          <select id="simSpeed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+            <option value="8">8×</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <button id="btnResetView">Fit view</button>
+        <button id="btnResetLayout">Reset town</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tool <span class="hint">click on the map</span></h2>
+      <div class="tools" id="tools">
+        <button data-tool="select" class="active">🔍 Inspect</button>
+        <button data-tool="remove">✖ Remove car</button>
+        <button data-tool="addDef"><i class="dot def"></i> Add defensive</button>
+        <button data-tool="addAgg"><i class="dot agg"></i> Add aggressive</button>
+        <button data-tool="plain">✚ Junction</button>
+        <button data-tool="lights">🚦 Traffic lights</button>
+        <button data-tool="roundabout">⟲ Roundabout</button>
+        <button data-tool="road">🛣 Add/remove road</button>
+        <button data-tool="limit30"><i class="sign">30</i> Limit 30</button>
+        <button data-tool="limit50"><i class="sign">50</i> Limit 50</button>
+      </div>
+      <p id="toolHelp" class="help"></p>
+    </section>
+
+    <section>
+      <h2>Cars</h2>
+      <div class="row">
+        <button id="addDef5"><i class="dot def"></i> +5 defensive</button>
+        <button id="addAgg5"><i class="dot agg"></i> +5 aggressive</button>
+      </div>
+      <div class="row">
+        <button id="removeDef">− defensive</button>
+        <button id="removeAgg">− aggressive</button>
+        <button id="removeAll">Clear</button>
+      </div>
+      <table class="stats">
+        <thead><tr><th></th><th>Cars</th><th>Avg km/h</th><th>Speeding</th></tr></thead>
+        <tbody>
+          <tr><td><i class="dot def"></i> Defensive</td><td id="sDefN">0</td><td id="sDefV">–</td><td id="sDefS">–</td></tr>
+          <tr><td><i class="dot agg"></i> Aggressive</td><td id="sAggN">0</td><td id="sAggV">–</td><td id="sAggS">–</td></tr>
+        </tbody>
+      </table>
+      <p class="help small">“Speeding” = share of time driven above the posted limit.</p>
+    </section>
+
+    <section id="carInfo" hidden>
+      <h2>Selected car <span class="hint" id="ciId"></span></h2>
+      <dl>
+        <dt>Driver</dt><dd id="ciType"></dd>
+        <dt>Speed</dt><dd id="ciSpeed"></dd>
+        <dt>Limit here</dt><dd id="ciLimit"></dd>
+        <dt>Wants</dt><dd id="ciWant"></dd>
+        <dt>Accel.</dt><dd id="ciAcc"></dd>
+        <dt>Doing</dt><dd id="ciState"></dd>
+      </dl>
+      <div class="row">
+        <button id="ciToggle">Make aggressive</button>
+        <button id="ciRemove">Remove</button>
+      </div>
+    </section>
+
+    <section class="legend">
+      <h2>Drivers</h2>
+      <p><i class="dot def"></i> <b>Defensive</b> keeps to the limit, keeps a long gap (1.8 s), looks far ahead and brakes gently for lower limits, curves and junctions.</p>
+      <p><i class="dot agg"></i> <b>Aggressive</b> drives 10 km/h over the limit when it can, keeps a short gap (0.8 s), brakes late and hard and takes smaller gaps in traffic.</p>
+      <p class="small">Right-hand traffic. Plain junctions: give way to traffic from the right. Roundabouts: give way to cars already on the ring. Scroll to zoom, drag to pan.</p>
+    </section>
+  </aside>
+
+  <main>
+    <canvas id="canvas"></canvas>
+    <div id="toast" hidden></div>
+  </main>
+
+  <script src="js/sim.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

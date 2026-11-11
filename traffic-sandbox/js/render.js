@@ -40,7 +40,7 @@ class Renderer {
   }
 
   updateView() {
-    const b = this.world.bounds, m = 40;
+    const b = this.world.bounds, m = 22;
     const ww = b.x1 - b.x0 + 2 * m, wh = b.y1 - b.y0 + 2 * m;
     const base = Math.min(this.w / ww, this.h / wh);
     this.scale = base * this.zoom;
@@ -243,12 +243,16 @@ class Renderer {
 
   drawCars() {
     const ctx = this.ctx;
+    // When zoomed out, draw cars larger than life so they stay visible. Length grows less than
+    // width so cars queued bumper to bumper don't overlap.
+    const fl = Math.max(1, Math.min(1.3, 3.4 / this.scale));
+    const fw = Math.max(1, Math.min(1.6, 4.2 / this.scale));
     for (const c of this.world.cars) {
       const p = c.lane.at(c.pos);
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.a);
-      const L = c.length, W = c.width;
+      const L = c.length * fl, W = c.width * fw;
       if (c === this.selected || (this.hover && this.hover.kind === 'car' && this.hover.car === c)) {
         ctx.fillStyle = this.tool === 'remove' ? COLORS.remove : COLORS.highlight;
         roundRect(ctx, -L / 2 - 0.8, -W / 2 - 0.8, L + 1.6, W + 1.6, 1.2);
@@ -258,6 +262,9 @@ class Renderer {
       ctx.fillStyle = pal[Math.floor(c.shade * pal.length) % pal.length];
       roundRect(ctx, -L / 2, -W / 2, L, W, 0.6);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(10,14,20,0.85)';
+      ctx.lineWidth = 0.3;
+      ctx.stroke();
       // windscreen + roof
       ctx.fillStyle = 'rgba(20,30,45,0.75)';
       ctx.fillRect(L * 0.08, -W / 2 + 0.25, L * 0.18, W - 0.5);

@@ -164,7 +164,7 @@ class World {
   constructor() {
     this.cols = 5;
     this.rows = 4;
-    this.spacing = 100;
+    this.spacing = 80;
     this.cars = [];
     this.time = 0;
     this.nextCarId = 1;

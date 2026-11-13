@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1d1b4a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vattensortering">
+<title>Vattensortering</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --tw: 48px; --th: 200px; --sh: 46px; --gap: 14px; --rowgap: 40px;
+    --glass-border: rgba(255,255,255,.6);
+    --btn: rgba(255,255,255,.12);
+    --btn-active: rgba(255,255,255,.22);
+    --accent: #ff4d6d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    color: #fff;
+    background: radial-gradient(ellipse at 50% 15%, #3d43a0 0%, #1f1d55 50%, #0d0b25 100%);
+    background-color: #1d1b4a;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px 4px; gap: 8px;
+  }
+  .title { display: flex; flex-direction: column; line-height: 1.1; }
+  .title small { opacity: .6; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  .title b { font-size: 26px; font-weight: 800; }
+  .group { display: flex; gap: 8px; }
+  button {
+    font: inherit; color: inherit; border: none; cursor: pointer;
+  }
+  .iconbtn {
+    width: 46px; height: 46px; border-radius: 15px; background: var(--btn);
+    display: grid; place-items: center; position: relative;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 4px 12px rgba(0,0,0,.25);
+    transition: transform .1s, background .15s, opacity .15s;
+  }
+  .iconbtn:active { transform: scale(.92); background: var(--btn-active); }
+  .iconbtn svg { width: 24px; height: 24px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .iconbtn.off { opacity: .4; }
+  .badge {
+    position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: 10px; background: var(--accent); font-size: 12px; font-weight: 800;
+    line-height: 20px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
+  footer {
+    display: flex; justify-content: center; gap: 18px; padding: 8px 16px 18px;
+  }
+  footer .iconbtn { width: 58px; height: 58px; border-radius: 18px; }
+  footer .iconbtn svg { width: 28px; height: 28px; }
+
+  #board {
+    flex: 1; position: relative; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: var(--rowgap); padding: 30px 12px 12px;
+  }
+  .row { display: flex; justify-content: center; gap: var(--gap); }
+  .tube {
+    position: relative; width: var(--tw); height: var(--th); cursor: pointer;
+    transition: transform .18s ease-out;
+  }
+  .tube.sel { transform: translateY(-24px); }
+  .tube.shake { animation: shake .35s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
+  }
+  .tube.hint .glass { box-shadow: 0 0 0 3px #ffe066, 0 0 22px #ffe066; }
+  .tube::before { /* rim */
+    content: ""; position: absolute; top: -5px; left: -6px; right: -6px; height: 8px;
+    border-radius: 5px; background: rgba(255,255,255,.7); z-index: 2;
+  }
+  .glass {
+    position: absolute; inset: 0;
+    border: 3px solid var(--glass-border); border-top: none;
+    border-radius: 0 0 calc(var(--tw) / 2) calc(var(--tw) / 2);
+    background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.14) 30%, rgba(255,255,255,.04) 65%, rgba(255,255,255,.1));
+    overflow: hidden; display: flex; flex-direction: column-reverse;
+    transition: box-shadow .3s;
+  }
+  .glass::after { /* reflection */
+    content: ""; position: absolute; left: 16%; top: 8%; bottom: 10%; width: 13%;
+    border-radius: 8px; background: linear-gradient(rgba(255,255,255,.4), rgba(255,255,255,.04));
+    pointer-events: none;
+  }
+  .slot { height: var(--sh); flex: none; display: flex; flex-direction: column; justify-content: flex-end; }
+  .fill { height: 0; width: 100%; }
+  .fill.on { height: 100%; }
+  .slot.top .fill { box-shadow: inset 0 3px 0 rgba(255,255,255,.28); }
+  .tube.done::after { /* cork */
+    content: ""; position: absolute; left: 14%; right: 14%; top: -16px; height: 15px; z-index: 3;
+    border-radius: 4px 4px 2px 2px;
+    background: linear-gradient(90deg, #a86b36, #d79b5d 45%, #9c6230);
+    box-shadow: 0 2px 4px rgba(0,0,0,.35);
+    animation: pop .35s ease-out;
+  }
+  @keyframes pop { from { transform: translateY(-22px) scale(1.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tube.done .glass { box-shadow: 0 0 18px rgba(255,255,255,.35); }
+
+  #stream {
+    position: absolute; width: 7px; border-radius: 4px; height: 0; z-index: 20;
+    pointer-events: none; transform-origin: top; opacity: 0;
+  }
+
+  #toast {
+    position: fixed; left: 50%; top: calc(74px + env(safe-area-inset-top)); transform: translateX(-50%) translateY(-12px);
+    background: rgba(0,0,0,.75); padding: 10px 18px; border-radius: 22px; font-size: 15px;
+    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 60;
+    max-width: calc(100% - 32px); text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #overlay {
+    position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center;
+    background: rgba(8,6,30,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  #overlay.show { display: flex; }
+  .card {
+    background: linear-gradient(160deg, #4a4fc4, #2b2878); border-radius: 26px; padding: 28px 26px 24px;
+    text-align: center; width: min(320px, calc(100% - 32px));
+    box-shadow: 0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.25);
+    animation: cardIn .4s cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes cardIn { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  .card h2 { margin: 0 0 6px; font-size: 30px; }
+  .card p { margin: 0 0 20px; opacity: .8; }
+  .stars { font-size: 40px; letter-spacing: 6px; margin-bottom: 8px; color: #ffd60a; text-shadow: 0 3px 10px rgba(255,214,10,.5); }
+  .bigbtn {
+    width: 100%; padding: 15px; border-radius: 16px; font-size: 18px; font-weight: 800;
+    background: linear-gradient(#5eea7d, #23b14a); box-shadow: 0 5px 0 #17803a, 0 8px 18px rgba(0,0,0,.3);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .bigbtn:active { transform: translateY(4px); box-shadow: 0 1px 0 #17803a; }
+  .linkbtn { background: none; margin-top: 14px; opacity: .75; font-size: 15px; text-decoration: underline; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 55; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title"><small>Nivå</small><b id="level">1</b></div>
+    <div class="group">
+      <button class="iconbtn" id="btnSound" aria-label="Ljud">
+        <svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+      <button class="iconbtn" id="btnRestart" aria-label="Börja om">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="board"><div id="stream"></div></main>
+
+  <footer>
+    <button class="iconbtn" id="btnUndo" aria-label="Ångra">
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      <span class="badge" id="undoCount">5</span>
+    </button>
+    <button class="iconbtn" id="btnHint" aria-label="Tips">
+      <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+      <span class="badge" id="hintCount">3</span>
+    </button>
+    <button class="iconbtn" id="btnTube" aria-label="Extra rör">
+      <svg viewBox="0 0 24 24"><path d="M8 3v13a4 4 0 0 0 8 0V3"/><path d="M6 3h12"/><path d="M12 8v6M9 11h6"/></svg>
+      <span class="badge" id="tubeCount">1</span>
+    </button>
+  </footer>
+
+  <div id="toast"></div>
+  <canvas id="confetti"></canvas>
+
+  <div id="overlay">
+    <div class="card">
+      <div class="stars">★★★</div>
+      <h2>Snyggt!</h2>
+      <p id="winText">Nivå 1 klar</p>
+      <button class="bigbtn" id="btnNext">Nästa nivå</button>
+      <button class="linkbtn" id="btnReplay">Spela nivån igen</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Konstanter ----------
+  const CAP = 4;
+  const UNDOS = 5, HINTS = 3, EXTRA = 1;
+  const PALETTE = [
+    '#ff3b47', '#2f7bff', '#2ecc52', '#ffd60a', '#a64dff', '#ff8c1a',
+    '#ff6ec7', '#28d7f0', '#9be33a', '#8b5a2b', '#9aa3b2', '#1d3c99',
+    '#14b8a6', '#f2e3c4'
+  ];
+  const STORE_KEY = 'vattensortering.v1';
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const board = $('board'), stream = $('stream');
+
+  // ---------- Hjälpfunktioner ----------
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const clone = t => t.map(x => x.slice());
+  const top = a => a[a.length - 1];
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(arr, rng) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  function runLength(a) {
+    if (!a.length) return 0;
+    const c = top(a); let n = 1;
+    while (n < a.length && a[a.length - 1 - n] === c) n++;
+    return n;
+  }
+  const isComplete = a => a.length === CAP && runLength(a) === CAP;
+  const isSolved = t => t.every(a => a.length === 0 || isComplete(a));
+  function canPour(t, i, j) {
+    if (i === j) return false;
+    const a = t[i], b = t[j];
+    if (!a.length || b.length >= CAP) return false;
+    return !b.length || top(b) === top(a);
+  }
+  function pourCount(t, i, j) {
+    return Math.min(runLength(t[i]), CAP - t[j].length);
+  }
+
+  // ---------- Lösare (DFS) – används för att garantera lösbara nivåer och för tips ----------
+  function solve(start, limit) {
+    const t = clone(start);
+    const seen = new Set();
+    const path = [];
+    let nodes = 0;
+    const key = () => t.map(a => a.join(',')).sort().join('|');
+
+    function dfs() {
+      if (isSolved(t)) return true;
+      if (++nodes > limit) return false;
+      const k = key();
+      if (seen.has(k)) return false;
+      seen.add(k);
+
+      const moves = [];
+      for (let i = 0; i < t.length; i++) {
+        const a = t[i];
+        if (!a.length) continue;
+        const run = runLength(a);
+        const uniform = run === a.length;
+        if (uniform && a.length === CAP) continue;
+        let emptyTried = false;
+        for (let j = 0; j < t.length; j++) {
+          if (j === i) continue;
+          const b = t[j];
+          if (b.length >= CAP) continue;
+          if (!b.length) {
+            if (uniform || emptyTried) continue;
+            emptyTried = true;
+            moves.push([i, j, run, 2]);
+          } else if (top(b) === top(a)) {
+            const cnt = Math.min(run, CAP - b.length);
+            moves.push([i, j, cnt, cnt === run ? 0 : 1]);
+          }
+        }
+      }
+      moves.sort((x, y) => x[3] - y[3]);
+      for (const [i, j, cnt] of moves) {
+        for (let n = 0; n < cnt; n++) t[j].push(t[i].pop());
+        path.push([i, j]);
+        if (dfs()) return true;
+        path.pop();
+        for (let n = 0; n < cnt; n++) t[i].push(t[j].pop());
+        if (nodes > limit) return false;
+      }
+      return false;
+    }
+    return dfs() ? path : null;
+  }
+
+  // ---------- Nivågenerering ----------
+  function colorsForLevel(level) {
+    return Math.min(12, 2 + Math.ceil(level / 2));
+  }
+  function generateLevel(level) {
+    const rng = mulberry32(level * 7919 + 1301);
+    const n = colorsForLevel(level);
+    let last = null;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const colors = shuffle([...PALETTE.keys()], rng).slice(0, n);
+      const pool = [];
+      colors.forEach(c => { for (let k = 0; k < CAP; k++) pool.push(c); });
+      shuffle(pool, rng);
+      const tubes = [];
+      for (let i = 0; i < n; i++) tubes.push(pool.slice(i * CAP, (i + 1) * CAP));
+      tubes.push([], []);
+      // undvik rör som redan är klara eller nästan klara från start
+      if (tubes.some(a => a.length && runLength(a) >= 3)) continue;
+      last = tubes;
+      if (solve(tubes, 40000)) return tubes;
+    }
+    if (last) { last.push([]); return last; } // nödutgång: ett extra tomt rör
+    return [[0, 1, 0, 1], [1, 0, 1, 0], [], []];
+  }
+
+  // ---------- Tillstånd ----------
+  let S = null;
+  let sel = null;
+  let busy = false;
+  let sound = true;
+
+  function newGame(level) {
+    const tubes = generateLevel(level);
+    S = {
+      level, tubes, initial: clone(tubes), history: [],
+      undos: UNDOS, hints: HINTS, extra: EXTRA, moves: 0
+    };
+    sel = null; hintPlan = null;
+    save();
+    layout(); render();
+  }
+  function save() {
+    try {
+      const s = { ...S, history: S.history.slice(-UNDOS), sound };
+      localStorage.setItem(STORE_KEY, JSON.stringify(s));
+    } catch (e) { /* ignoreras */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s || !Array.isArray(s.tubes) || !s.level) return null;
+      return s;
+    } catch (e) { return null; }
+  }
+
+  // ---------- Ljud ----------
+  let actx = null;
+  function audio() {
+    if (!sound) return null;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function tone(freq, dur, type = 'sine', vol = .15, slideTo = null, delay = 0) {
+    const ctx = audio(); if (!ctx) return;
+    const t0 = ctx.currentTime + delay;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + .02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + .05);
+  }
+  const sfx = {
+    pick: () => tone(520, .08, 'sine', .08),
+    pour: n => { for (let k = 0; k < n; k++) tone(260 + k * 70, .16, 'sine', .12, 520 + k * 90, k * .15); },
+    bad: () => tone(160, .15, 'square', .05),
+    done: () => { tone(660, .12, 'triangle', .12); tone(990, .2, 'triangle', .12, null, .1); },
+    win: () => [523, 659, 784, 1047].forEach((f, k) => tone(f, .3, 'triangle', .14, null, k * .12))
+  };
+  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+
+  // ---------- Layout & rendering ----------
+  function layout() {
+    const n = S.tubes.length;
+    const W = board.clientWidth - 24;
+    const H = board.clientHeight - 42;
+    const maxPer = W < 520 ? 7 : 10;
+    const rows = Math.ceil(n / maxPer);
+    const per = Math.ceil(n / rows);
+    let gap = Math.max(10, Math.min(24, W * .045));
+    let tw = Math.min(60, (W - gap * (per - 1)) / per);
+    let sh = tw * 1.0;
+    let th = sh * CAP + sh * .55;
+    let rowGap = Math.max(40, sh * 1.1);
+    const total = rows * th + (rows - 1) * rowGap;
+    if (total > H) {
+      const f = H / total;
+      tw *= f; sh *= f; th *= f; rowGap *= f; gap *= Math.max(f, .8);
+    }
+    const st = document.documentElement.style;
+    st.setProperty('--tw', tw + 'px');
+    st.setProperty('--sh', sh + 'px');
+    st.setProperty('--th', th + 'px');
+    st.setProperty('--gap', gap + 'px');
+    st.setProperty('--rowgap', rowGap + 'px');
+    S._rows = rows; S._per = per;
+  }
+
+  function render() {
+    board.querySelectorAll('.row').forEach(r => r.remove());
+    const { tubes } = S;
+    const per = S._per;
+    let row = null;
+    tubes.forEach((a, i) => {
+      if (i % per === 0) { row = document.createElement('div'); row.className = 'row'; board.appendChild(row); }
+      const tube = document.createElement('div');
+      tube.className = 'tube' + (isComplete(a) ? ' done' : '') + (sel === i ? ' sel' : '');
+      tube.dataset.i = i;
+      const glass = document.createElement('div');
+      glass.className = 'glass';
+      for (let k = 0; k < CAP; k++) {
+        const slot = document.createElement('div');
+        slot.className = 'slot' + (k === a.length - 1 ? ' top' : '');
+        const fill = document.createElement('div');
+        fill.className = 'fill';
+        if (k < a.length) { fill.classList.add('on'); fill.style.background = PALETTE[a[k]]; }
+        slot.appendChild(fill);
+        glass.appendChild(slot);
+      }
+      tube.appendChild(glass);
+      row.appendChild(tube);
+    });
+    $('level').textContent = S.level;
+    $('undoCount').textContent = S.undos;
+    $('hintCount').textContent = S.hints;
+    $('tubeCount').textContent = S.extra;
+    $('btnUndo').classList.toggle('off', !S.undos || !S.history.length);
+    $('btnHint').classList.toggle('off', !S.hints);
+    $('btnTube').classList.toggle('off', !S.extra);
+  }
+  const tubeEl = i => board.querySelector(`.tube[data-i="${i}"]`);
+
+  let toastTimer = 0;
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1900);
+  }
+
+  // ---------- Interaktion ----------
+  board.addEventListener('click', e => {
+    if (busy) return;
+    const el = e.target.closest('.tube');
+    if (!el) { if (sel !== null) { sel = null; render(); } return; }
+    const i = +el.dataset.i;
+    clearHint();
+    if (sel === null) {
+      const a = S.tubes[i];
+      if (!a.length || isComplete(a)) { shake(el); return; }
+      sel = i; el.classList.add('sel'); sfx.pick(); buzz(8);
+      return;
+    }
+    if (sel === i) { el.classList.remove('sel'); sel = null; return; }
+    if (canPour(S.tubes, sel, i)) {
+      pour(sel, i);
+    } else {
+      sfx.bad(); shake(el);
+      const old = tubeEl(sel); old && old.classList.remove('sel');
+      sel = null;
+    }
+  });
+
+  function shake(el) {
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    setTimeout(() => el.classList.remove('shake'), 400);
+  }
+
+  async function pour(i, j) {
+    busy = true;
+    const t = S.tubes;
+    const color = PALETTE[top(t[i])];
+    const cnt = pourCount(t, i, j);
+    const srcEl = tubeEl(i), dstEl = tubeEl(j);
+    const tw = srcEl.offsetWidth, th = srcEl.offsetHeight;
+    const sh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sh'));
+
+    // positioner relativt brädet (offset* ignorerar transform)
+    const pos = el => ({ x: el.offsetLeft, y: el.offsetTop }); // offsetParent = #board
+    const sp = pos(srcEl), dp = pos(dstEl);
+    const side = dp.x >= sp.x ? 1 : -1;
+    const mouthX = dp.x + tw / 2 - side * tw * .22;
+    const mouthY = dp.y - th * .2;
+    const tx = mouthX - (sp.x + tw / 2);
+    const ty = mouthY - sp.y;
+    const angle = side * 74;
+
+    srcEl.classList.remove('sel');
+    srcEl.style.zIndex = 10;
+    srcEl.style.transformOrigin = '50% 0';
+    srcEl.style.transition = 'transform 300ms cubic-bezier(.45,.05,.35,1)';
+    srcEl.style.transform = `translate(${tx}px, ${ty}px) rotate(${angle}deg)`;
+    await wait(300);
+
+    // stråle
+    const lenJ = t[j].length;
+    const surfaceY = dp.y + th - 3 - lenJ * sh;
+    stream.style.background = color;
+    stream.style.left = (mouthX - 3.5) + 'px';
+    stream.style.top = mouthY + 'px';
+    stream.style.transition = 'none';
+    stream.style.height = '0px';
+    stream.style.opacity = '1';
+    void stream.offsetWidth;
+    stream.style.transition = 'height 120ms linear';
+    stream.style.height = Math.max(0, surfaceY - mouthY) + 'px';
+    sfx.pour(cnt); buzz(15);
+
+    // töm källa / fyll mål, ett segment i taget
+    const per = 150;
+    const srcFills = srcEl.querySelectorAll('.fill');
+    const dstFills = dstEl.querySelectorAll('.fill');
+    const lenI = t[i].length;
+    for (let k = 0; k < cnt; k++) {
+      const f = srcFills[lenI - 1 - k];
+      f.style.transition = `height ${per}ms linear ${100 + k * per}ms`;
+      f.classList.remove('on');
+      const d = dstFills[lenJ + k];
+      d.style.background = color;
+      d.style.transition = 'none';
+      d.classList.remove('on');
+      void d.offsetWidth;
+      d.style.transition = `height ${per}ms linear ${100 + k * per}ms`;
+      d.classList.add('on');
+    }
+    // strålen följer vätskeytan uppåt
+    await wait(100 + cnt * per);
+    stream.style.transition = 'opacity 120ms';
+    stream.style.opacity = '0';
+
+    // uppdatera tillstånd
+    S.history.push(clone(t));
+    if (S.history.length > 30) S.history.shift();
+    for (let k = 0; k < cnt; k++) t[j].push(t[i].pop());
+    S.moves++;
+    sel = null;
+
+    srcEl.style.transition = 'transform 260ms cubic-bezier(.45,.05,.35,1)';
+    srcEl.style.transform = '';
+    await wait(260);
+    srcEl.style.zIndex = '';
+    srcEl.style.transformOrigin = '';
+    srcEl.style.transition = '';
+    render();
+    save();
+    busy = false;
+
+    if (isComplete(t[j])) { sfx.done(); buzz([20, 40, 20]); }
+    if (isSolved(t)) { setTimeout(win, 350); return; }
+    if (!hasAnyMove()) toast('Inga drag kvar – ångra, lägg till ett rör eller börja om');
+  }
+
+  function hasAnyMove() {
+    const t = S.tubes;
+    for (let i = 0; i < t.length; i++)
+      for (let j = 0; j < t.length; j++)
+        if (canPour(t, i, j)) return true;
+    return false;
+  }
+
+  // ---------- Knappar ----------
+  $('btnUndo').addEventListener('click', () => {
+    if (busy) return;
+    if (!S.history.length) { toast('Inget att ångra'); return; }
+    if (!S.undos) { toast('Inga ångringar kvar på den här nivån'); return; }
+    S.tubes = S.history.pop();
+    S.undos--; sel = null; clearHint();
+    layout(); render(); save(); sfx.pick();
+  });
+
+  $('btnRestart').addEventListener('click', () => {
+    if (busy) return;
+    S.tubes = clone(S.initial); S.history = [];
+    S.undos = UNDOS; S.hints = HINTS; S.extra = EXTRA; S.moves = 0;
+    sel = null; clearHint();
+    layout(); render(); save();
+    toast('Nivån startades om');
+  });
+
+  $('btnTube').addEventListener('click', () => {
+    if (busy) return;
+    if (!S.extra) { toast('Du har redan använt extraröret'); return; }
+    S.extra--;
+    S.tubes.push([]);
+    S.history.forEach(h => h.push([]));
+    sel = null; clearHint();
+    layout(); render(); save(); sfx.done();
+  });
+
+  let hinted = [];
+  let hintPlan = null;
+  const stateKey = t => t.map(a => a.join(',')).join('|');
+  function clearHint() {
+    hinted.forEach(i => { const el = tubeEl(i); el && el.classList.remove('hint'); });
+    hinted = [];
+  }
+  $('btnHint').addEventListener('click', () => {
+    if (busy) return;
+    if (!S.hints) { toast('Inga tips kvar på den här nivån'); return; }
+    // Följ en tidigare beräknad lösning om spelaren gått efter den, annars räkna fram en ny
+    const k = stateKey(S.tubes);
+    let move = null;
+    if (hintPlan) {
+      const idx = hintPlan.keys.indexOf(k);
+      if (idx >= 0 && idx < hintPlan.path.length) move = hintPlan.path[idx];
+    }
+    if (!move) {
+      const path = solve(S.tubes, 150000);
+      if (path && path.length) {
+        const t = clone(S.tubes), keys = [];
+        for (const [a, b] of path) {
+          keys.push(stateKey(t));
+          const c = pourCount(t, a, b);
+          for (let n = 0; n < c; n++) t[b].push(t[a].pop());
+        }
+        hintPlan = { path, keys };
+        move = path[0];
+      }
+    }
+    if (!move) { toast('Hittar ingen lösning härifrån – prova att ångra'); return; }
+    S.hints--;
+    const [i, j] = move;
+    sel = i; // lyft källröret, markera målet
+    render(); save();
+    hinted = [j];
+    tubeEl(j).classList.add('hint');
+    sfx.pick();
+    toast('Tryck på det lysande röret för att hälla');
+  });
+
+  $('btnSound').addEventListener('click', () => {
+    sound = !sound;
+    $('btnSound').classList.toggle('off', !sound);
+    $('wave').style.display = sound ? '' : 'none';
+    save();
+    if (sound) sfx.pick();
+  });
+
+  // ---------- Vinst ----------
+  function win() {
+    sfx.win(); buzz([30, 60, 30, 60, 60]);
+    const stars = S.moves && S.undos === UNDOS && S.extra === EXTRA && S.hints === HINTS ? 3
+      : (S.hints === HINTS ? 2 : 1);
+    document.querySelector('.stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+    $('winText').textContent = `Nivå ${S.level} klar på ${S.moves} drag`;
+    $('overlay').classList.add('show');
+    confetti();
+  }
+  $('btnNext').addEventListener('click', () => {
+    $('overlay').classList.remove('show');
+    newGame(S.level + 1);
+  });
+  $('btnReplay').addEventListener('click', () => {
+    $('overlay').classList.remove('show');
+    newGame(S.level);
+  });
+
+  function confetti() {
+    const c = $('confetti'), ctx = c.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    const parts = Array.from({ length: 140 }, () => ({
+      x: innerWidth / 2 + (Math.random() - .5) * 60, y: innerHeight * .35,
+      vx: (Math.random() - .5) * 14, vy: -Math.random() * 14 - 4,
+      r: Math.random() * 6 + 4, a: Math.random() * 6, va: (Math.random() - .5) * .4,
+      col: PALETTE[Math.floor(Math.random() * 10)]
+    }));
+    const t0 = performance.now();
+    (function frame(now) {
+      const el = now - t0;
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      parts.forEach(p => {
+        p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.globalAlpha = Math.max(0, 1 - el / 2600);
+        ctx.fillStyle = p.col; ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
+        ctx.restore();
+      });
+      if (el < 2600) requestAnimationFrame(frame);
+      else ctx.clearRect(0, 0, innerWidth, innerHeight);
+    })(t0);
+  }
+
+  // ---------- Start ----------
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame };
+  window.addEventListener('resize', () => { if (!busy) { layout(); render(); } });
+
+  const saved = load();
+  if (saved) {
+    S = {
+      level: saved.level, tubes: saved.tubes, initial: saved.initial || clone(saved.tubes),
+      history: saved.history || [], undos: saved.undos ?? UNDOS, hints: saved.hints ?? HINTS,
+      extra: saved.extra ?? EXTRA, moves: saved.moves || 0
+    };
+    sound = saved.sound !== false;
+    $('btnSound').classList.toggle('off', !sound);
+    $('wave').style.display = sound ? '' : 'none';
+    layout(); render();
+    if (isSolved(S.tubes)) newGame(S.level + 1);
+  } else {
+    newGame(1);
+  }
+
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>

@@ -378,7 +378,7 @@
   }
   const sfx = {
     pick: () => tone(520, .08, 'sine', .08),
-    pour: n => { for (let k = 0; k < n; k++) tone(260 + k * 70, .16, 'sine', .12, 520 + k * 90, k * .15); },
+    pour: n => { for (let k = 0; k < n; k++) tone(260 + k * 70, .09, 'sine', .12, 520 + k * 90, k * .075); },
     bad: () => tone(160, .15, 'square', .05),
     done: () => { tone(660, .12, 'triangle', .12); tone(990, .2, 'triangle', .12, null, .1); },
     win: () => [523, 659, 784, 1047].forEach((f, k) => tone(f, .3, 'triangle', .14, null, k * .12))
@@ -504,9 +504,9 @@
     srcEl.classList.remove('sel');
     srcEl.style.zIndex = 10;
     srcEl.style.transformOrigin = '50% 0';
-    srcEl.style.transition = 'transform 300ms cubic-bezier(.45,.05,.35,1)';
+    srcEl.style.transition = 'transform 150ms cubic-bezier(.45,.05,.35,1)';
     srcEl.style.transform = `translate(${tx}px, ${ty}px) rotate(${angle}deg)`;
-    await wait(300);
+    await wait(150);
 
     // stråle
     const lenJ = t[j].length;
@@ -518,30 +518,30 @@
     stream.style.height = '0px';
     stream.style.opacity = '1';
     void stream.offsetWidth;
-    stream.style.transition = 'height 120ms linear';
+    stream.style.transition = 'height 60ms linear';
     stream.style.height = Math.max(0, surfaceY - mouthY) + 'px';
     sfx.pour(cnt); buzz(15);
 
     // töm källa / fyll mål, ett segment i taget
-    const per = 150;
+    const per = 75;
     const srcFills = srcEl.querySelectorAll('.fill');
     const dstFills = dstEl.querySelectorAll('.fill');
     const lenI = t[i].length;
     for (let k = 0; k < cnt; k++) {
       const f = srcFills[lenI - 1 - k];
-      f.style.transition = `height ${per}ms linear ${100 + k * per}ms`;
+      f.style.transition = `height ${per}ms linear ${50 + k * per}ms`;
       f.classList.remove('on');
       const d = dstFills[lenJ + k];
       d.style.background = color;
       d.style.transition = 'none';
       d.classList.remove('on');
       void d.offsetWidth;
-      d.style.transition = `height ${per}ms linear ${100 + k * per}ms`;
+      d.style.transition = `height ${per}ms linear ${50 + k * per}ms`;
       d.classList.add('on');
     }
     // strålen följer vätskeytan uppåt
-    await wait(100 + cnt * per);
-    stream.style.transition = 'opacity 120ms';
+    await wait(50 + cnt * per);
+    stream.style.transition = 'opacity 60ms';
     stream.style.opacity = '0';
 
     // uppdatera tillstånd
@@ -551,9 +551,9 @@
     S.moves++;
     sel = null;
 
-    srcEl.style.transition = 'transform 260ms cubic-bezier(.45,.05,.35,1)';
+    srcEl.style.transition = 'transform 130ms cubic-bezier(.45,.05,.35,1)';
     srcEl.style.transform = '';
-    await wait(260);
+    await wait(130);
     srcEl.style.zIndex = '';
     srcEl.style.transformOrigin = '';
     srcEl.style.transition = '';

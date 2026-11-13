@@ -67,18 +67,16 @@
     justify-content: center; align-items: center; gap: var(--rowgap); padding: 30px 12px 12px;
   }
   .row { display: flex; justify-content: center; gap: var(--gap); }
-  .tube {
-    position: relative; width: var(--tw); height: var(--th); cursor: pointer;
-    transition: transform .18s ease-out;
-  }
-  .tube.sel { transform: translateY(-24px); }
+  .tube { position: relative; width: var(--tw); height: var(--th); cursor: pointer; }
+  .body { position: absolute; inset: 0; transition: transform .18s ease-out; }
+  .tube.sel .body { transform: translateY(-24px); }
   .tube.shake { animation: shake .35s; }
   @keyframes shake {
     0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); }
     40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
   }
   .tube.hint .glass { box-shadow: 0 0 0 3px #ffe066, 0 0 22px #ffe066; }
-  .tube::before { /* rim */
+  .body::before { /* rim */
     content: ""; position: absolute; top: -5px; left: -6px; right: -6px; height: 8px;
     border-radius: 5px; background: rgba(255,255,255,.7); z-index: 2;
   }
@@ -99,7 +97,7 @@
   .fill { height: 0; width: 100%; }
   .fill.on { height: 100%; }
   .slot.top .fill { box-shadow: inset 0 3px 0 rgba(255,255,255,.28); }
-  .tube.done::after { /* cork */
+  .tube.done .body::after { /* cork */
     content: ""; position: absolute; left: 14%; right: 14%; top: -16px; height: 15px; z-index: 3;
     border-radius: 4px 4px 2px 2px;
     background: linear-gradient(90deg, #a86b36, #d79b5d 45%, #9c6230);
@@ -109,7 +107,7 @@
   @keyframes pop { from { transform: translateY(-22px) scale(1.3); opacity: 0; } to { transform: none; opacity: 1; } }
   .tube.done .glass { box-shadow: 0 0 18px rgba(255,255,255,.35); }
 
-  #stream {
+  .stream {
     position: absolute; width: 7px; border-radius: 4px; height: 0; z-index: 20;
     pointer-events: none; transform-origin: top; opacity: 0;
   }
@@ -160,7 +158,7 @@
     </div>
   </header>
 
-  <main id="board"><div id="stream"></div></main>
+  <main id="board"></main>
 
   <footer>
     <button class="iconbtn" id="btnUndo" aria-label="Ångra">
@@ -206,7 +204,7 @@
 
   // ---------- DOM ----------
   const $ = id => document.getElementById(id);
-  const board = $('board'), stream = $('stream');
+  const board = $('board');
 
   // ---------- Hjälpfunktioner ----------
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -325,7 +323,10 @@
   // ---------- Tillstånd ----------
   let S = null;
   let sel = null;
-  let busy = false;
+  let anims = 0;            // antal pågående hällningar
+  const active = {};        // tub-index -> antal animationer som rör tuben
+  const flying = {};        // tub-index -> true medan röret är i luften
+  let pendingLayout = false;
   let sound = true;
 
   function newGame(level) {
@@ -420,22 +421,28 @@
     tubes.forEach((a, i) => {
       if (i % per === 0) { row = document.createElement('div'); row.className = 'row'; board.appendChild(row); }
       const tube = document.createElement('div');
-      tube.className = 'tube' + (isComplete(a) ? ' done' : '') + (sel === i ? ' sel' : '');
+      tube.className = 'tube';
       tube.dataset.i = i;
       const glass = document.createElement('div');
       glass.className = 'glass';
       for (let k = 0; k < CAP; k++) {
         const slot = document.createElement('div');
-        slot.className = 'slot' + (k === a.length - 1 ? ' top' : '');
+        slot.className = 'slot';
         const fill = document.createElement('div');
         fill.className = 'fill';
-        if (k < a.length) { fill.classList.add('on'); fill.style.background = PALETTE[a[k]]; }
         slot.appendChild(fill);
         glass.appendChild(slot);
       }
-      tube.appendChild(glass);
+      const body = document.createElement('div');
+      body.className = 'body';
+      body.appendChild(glass);
+      tube.appendChild(body);
       row.appendChild(tube);
+      paintTube(i, tube);
     });
+    updateHud();
+  }
+  function updateHud() {
     $('level').textContent = S.level;
     $('undoCount').textContent = S.undos;
     $('hintCount').textContent = S.hints;
@@ -443,6 +450,21 @@
     $('btnUndo').classList.toggle('off', !S.undos || !S.history.length);
     $('btnHint').classList.toggle('off', !S.hints);
     $('btnTube').classList.toggle('off', !S.extra);
+  }
+  // Ritar om en tubs innehåll från tillståndet (utan att bygga om DOM)
+  function paintTube(i, tube = tubeEl(i)) {
+    if (!tube) return;
+    const a = S.tubes[i];
+    tube.classList.toggle('done', isComplete(a));
+    tube.classList.toggle('sel', sel === i);
+    const slots = tube.querySelectorAll('.slot');
+    slots.forEach((slot, k) => {
+      slot.classList.toggle('top', k === a.length - 1);
+      const f = slot.firstChild;
+      f.style.transition = 'none';
+      f.classList.toggle('on', k < a.length);
+      f.style.background = k < a.length ? PALETTE[a[k]] : '';
+    });
   }
   const tubeEl = i => board.querySelector(`.tube[data-i="${i}"]`);
 
@@ -456,9 +478,8 @@
 
   // ---------- Interaktion ----------
   board.addEventListener('click', e => {
-    if (busy) return;
     const el = e.target.closest('.tube');
-    if (!el) { if (sel !== null) { sel = null; render(); } return; }
+    if (!el) { if (sel !== null) { const o = tubeEl(sel); sel = null; o && o.classList.remove('sel'); } return; }
     const i = +el.dataset.i;
     clearHint();
     if (sel === null) {
@@ -483,11 +504,30 @@
   }
 
   async function pour(i, j) {
-    busy = true;
     const t = S.tubes;
     const color = PALETTE[top(t[i])];
     const cnt = pourCount(t, i, j);
+    const lenI = t[i].length, lenJ = t[j].length;
     const srcEl = tubeEl(i), dstEl = tubeEl(j);
+    const srcBody = srcEl.firstChild;
+
+    // Uppdatera tillståndet direkt så att nästa drag kan göras medan animeringen pågår
+    S.history.push(clone(t));
+    if (S.history.length > 30) S.history.shift();
+    for (let k = 0; k < cnt; k++) t[j].push(t[i].pop());
+    S.moves++;
+    sel = null;
+    save();
+    updateHud();
+
+    anims++;
+    active[i] = (active[i] || 0) + 1;
+    active[j] = (active[j] || 0) + 1;
+    srcEl.classList.remove('sel');
+    // käll- eller målröret kan vara mitt i en egen hällning – vänta tills det landat
+    while (flying[i] || flying[j]) await wait(16);
+    flying[i] = true;
+
     const tw = srcEl.offsetWidth, th = srcEl.offsetHeight;
     const sh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sh'));
 
@@ -501,20 +541,21 @@
     const ty = mouthY - sp.y;
     const angle = side * 74;
 
-    srcEl.classList.remove('sel');
     srcEl.style.zIndex = 10;
-    srcEl.style.transformOrigin = '50% 0';
-    srcEl.style.transition = 'transform 150ms cubic-bezier(.45,.05,.35,1)';
-    srcEl.style.transform = `translate(${tx}px, ${ty}px) rotate(${angle}deg)`;
+    srcBody.style.pointerEvents = 'none'; // tryck går igenom till rören under
+    srcBody.style.transformOrigin = '50% 0';
+    srcBody.style.transition = 'transform 150ms cubic-bezier(.45,.05,.35,1)';
+    srcBody.style.transform = `translate(${tx}px, ${ty}px) rotate(${angle}deg)`;
     await wait(150);
 
     // stråle
-    const lenJ = t[j].length;
+    const stream = document.createElement('div');
+    stream.className = 'stream';
+    board.appendChild(stream);
     const surfaceY = dp.y + th - 3 - lenJ * sh;
     stream.style.background = color;
     stream.style.left = (mouthX - 3.5) + 'px';
     stream.style.top = mouthY + 'px';
-    stream.style.transition = 'none';
     stream.style.height = '0px';
     stream.style.opacity = '1';
     void stream.offsetWidth;
@@ -526,7 +567,6 @@
     const per = 75;
     const srcFills = srcEl.querySelectorAll('.fill');
     const dstFills = dstEl.querySelectorAll('.fill');
-    const lenI = t[i].length;
     for (let k = 0; k < cnt; k++) {
       const f = srcFills[lenI - 1 - k];
       f.style.transition = `height ${per}ms linear ${50 + k * per}ms`;
@@ -539,30 +579,29 @@
       d.style.transition = `height ${per}ms linear ${50 + k * per}ms`;
       d.classList.add('on');
     }
-    // strålen följer vätskeytan uppåt
     await wait(50 + cnt * per);
     stream.style.transition = 'opacity 60ms';
     stream.style.opacity = '0';
+    setTimeout(() => stream.remove(), 80);
 
-    // uppdatera tillstånd
-    S.history.push(clone(t));
-    if (S.history.length > 30) S.history.shift();
-    for (let k = 0; k < cnt; k++) t[j].push(t[i].pop());
-    S.moves++;
-    sel = null;
+    // målet är fyllt
+    if (!--active[j]) paintTube(j);
+    if (isComplete(t[j]) && lenJ + cnt === CAP) { sfx.done(); buzz([20, 40, 20]); }
 
-    srcEl.style.transition = 'transform 130ms cubic-bezier(.45,.05,.35,1)';
-    srcEl.style.transform = '';
+    srcBody.style.transition = 'transform 130ms cubic-bezier(.45,.05,.35,1)';
+    srcBody.style.transform = '';
     await wait(130);
     srcEl.style.zIndex = '';
-    srcEl.style.transformOrigin = '';
-    srcEl.style.transition = '';
-    render();
-    save();
-    busy = false;
+    srcBody.style.pointerEvents = '';
+    srcBody.style.transformOrigin = '';
+    srcBody.style.transition = '';
+    flying[i] = false;
+    if (!--active[i]) paintTube(i);
+    anims--;
 
-    if (isComplete(t[j])) { sfx.done(); buzz([20, 40, 20]); }
-    if (isSolved(t)) { setTimeout(win, 350); return; }
+    if (anims) return;
+    if (pendingLayout) { pendingLayout = false; layout(); render(); }
+    if (isSolved(t)) { setTimeout(win, 250); return; }
     if (!hasAnyMove()) toast('Inga drag kvar – ångra, lägg till ett rör eller börja om');
   }
 
@@ -576,7 +615,7 @@
 
   // ---------- Knappar ----------
   $('btnUndo').addEventListener('click', () => {
-    if (busy) return;
+    if (anims) return;
     if (!S.history.length) { toast('Inget att ångra'); return; }
     if (!S.undos) { toast('Inga ångringar kvar på den här nivån'); return; }
     S.tubes = S.history.pop();
@@ -585,7 +624,7 @@
   });
 
   $('btnRestart').addEventListener('click', () => {
-    if (busy) return;
+    if (anims) return;
     S.tubes = clone(S.initial); S.history = [];
     S.undos = UNDOS; S.hints = HINTS; S.extra = EXTRA; S.moves = 0;
     sel = null; clearHint();
@@ -594,7 +633,7 @@
   });
 
   $('btnTube').addEventListener('click', () => {
-    if (busy) return;
+    if (anims) return;
     if (!S.extra) { toast('Du har redan använt extraröret'); return; }
     S.extra--;
     S.tubes.push([]);
@@ -611,7 +650,7 @@
     hinted = [];
   }
   $('btnHint').addEventListener('click', () => {
-    if (busy) return;
+    if (anims) return;
     if (!S.hints) { toast('Inga tips kvar på den här nivån'); return; }
     // Följ en tidigare beräknad lösning om spelaren gått efter den, annars räkna fram en ny
     const k = stateKey(S.tubes);
@@ -700,7 +739,7 @@
 
   // ---------- Start ----------
   if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame };
-  window.addEventListener('resize', () => { if (!busy) { layout(); render(); } });
+  window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
   if (saved) {

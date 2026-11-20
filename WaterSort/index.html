@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#1d1b4a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,15 +20,19 @@
     --btn-active: rgba(255,255,255,.22);
     --accent: #ff4d6d;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; }
+  * {
+    box-sizing: border-box; -webkit-tap-highlight-color: transparent;
+    /* ingen textmarkering, ingen långtrycksmeny, ingen dubbeltrycks- eller nypzoom */
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    touch-action: none;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; touch-action: none; -webkit-text-size-adjust: 100%; }
   body {
     color: #fff;
     background: radial-gradient(ellipse at 50% 15%, #3d43a0 0%, #1f1d55 50%, #0d0b25 100%);
     background-color: #1d1b4a;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column;
-    touch-action: manipulation; user-select: none; -webkit-user-select: none;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   header {
@@ -477,8 +481,27 @@
   }
 
   // ---------- Interaktion ----------
-  board.addEventListener('click', e => {
+  // Dubbeltryck: ett andra tryck på samma målrör strax efter en hällning håller källröret markerat
+  const DOUBLE_TAP_MS = 400;
+  let lastPour = null;
+
+  // pointerdown reagerar direkt på både Android och iOS (ingen klickfördröjning)
+  board.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
     const el = e.target.closest('.tube');
+    if (el && lastPour && +el.dataset.i === lastPour.j && performance.now() - lastPour.t < DOUBLE_TAP_MS) {
+      const src = lastPour.i;
+      lastPour = null;
+      const a = S.tubes[src];
+      if (sel === null && a.length && !isComplete(a)) {
+        sel = src;
+        const t = tubeEl(src); t && t.classList.add('sel'); // lyfts när röret landat
+        sfx.pick(); buzz(8);
+      }
+      return;
+    }
+    lastPour = null;
     if (!el) { if (sel !== null) { const o = tubeEl(sel); sel = null; o && o.classList.remove('sel'); } return; }
     const i = +el.dataset.i;
     clearHint();
@@ -490,6 +513,7 @@
     }
     if (sel === i) { el.classList.remove('sel'); sel = null; return; }
     if (canPour(S.tubes, sel, i)) {
+      lastPour = { i: sel, j: i, t: performance.now() };
       pour(sel, i);
     } else {
       sfx.bad(); shake(el);
@@ -736,6 +760,18 @@
       else ctx.clearRect(0, 0, innerWidth, innerHeight);
     })(t0);
   }
+
+  // ---------- Stoppa zoom och markering (iOS ignorerar user-scalable=no) ----------
+  const stop = e => e.preventDefault();
+  ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', 'contextmenu', 'selectstart'].forEach(t =>
+    document.addEventListener(t, stop, { passive: false }));
+  document.addEventListener('touchmove', stop, { passive: false });
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = performance.now();
+    if (now - lastTouchEnd < 350 && !e.target.closest('button')) e.preventDefault(); // dubbeltryckszoom
+    lastTouchEnd = now;
+  }, { passive: false });
 
   // ---------- Start ----------
   if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame };

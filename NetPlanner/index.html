@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nätverksplanerare</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo">🔀</span>
+      <input id="projectName" class="ghost-input" title="Projektnamn" spellcheck="false">
+    </div>
+    <nav id="tabs" aria-label="Nätverk"></nav>
+    <div class="actions">
+      <button id="btnUndo" title="Ångra (Ctrl+Z)">↶</button>
+      <button id="btnRedo" title="Gör om (Ctrl+Y)">↷</button>
+      <button id="btnLayout" title="Ordna enheterna automatiskt som ett träd">Ordna</button>
+      <button id="btnReport" title="Materiallista och problem för alla nätverk">📋 Rapport</button>
+      <details class="menu">
+        <summary>Fil ▾</summary>
+        <div class="menu-body">
+          <button data-menu="new">Nytt projekt</button>
+          <button data-menu="example">Ladda exempelprojekt</button>
+          <hr>
+          <button data-menu="import">Importera projekt (.json)…</button>
+          <button data-menu="export-json">Exportera projekt (.json)</button>
+          <hr>
+          <button data-menu="export-svg">Exportera nätverksbild (.svg)</button>
+          <button data-menu="export-png">Exportera nätverksbild (.png)</button>
+          <button data-menu="export-csv">Exportera materiallista (.csv)</button>
+        </div>
+      </details>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <main>
+    <aside id="palette">
+      <div class="qty">
+        <label for="qty">Antal att lägga till</label>
+        <input id="qty" type="number" min="1" max="100" value="1">
+      </div>
+      <div id="paletteItems"></div>
+      <p class="muted small">Klicka eller dra in en enhet. Dra från den lilla pricken under en enhet till en annan för att koppla ihop dem.</p>
+    </aside>
+
+    <section id="canvasWrap">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" class="grid-dot"></circle>
+          </pattern>
+        </defs>
+        <rect id="gridRect" width="100%" height="100%" fill="url(#grid)"></rect>
+        <g id="viewport">
+          <g id="linksLayer"></g>
+          <g id="nodesLayer"></g>
+          <g id="overlayLayer"></g>
+        </g>
+        <rect id="marquee" class="marquee" visibility="hidden"></rect>
+      </svg>
+      <div id="emptyHint" class="empty-hint" hidden>
+        <h2>Tomt nätverk</h2>
+        <p>Dra in enheter från vänster, eller öppna <b>Fil → Ladda exempelprojekt</b>.</p>
+      </div>
+      <div class="zoom">
+        <button id="zoomIn" title="Zooma in">+</button>
+        <button id="zoomOut" title="Zooma ut">−</button>
+        <button id="zoomFit" title="Anpassa till fönstret">⤢</button>
+      </div>
+      <div class="legend small">
+        <span><i class="lg copper"></i>Kabel</span>
+        <span><i class="lg fiber"></i>Fiber</span>
+        <span><i class="lg wifi"></i>WiFi</span>
+        <span><i class="lg poe"></i>PoE</span>
+      </div>
+    </section>
+
+    <aside id="inspector"></aside>
+  </main>
+
+  <dialog id="reportDlg">
+    <div class="dlg-head">
+      <h2>Rapport</h2>
+      <div>
+        <button id="reportCsv">Ladda ner CSV</button>
+        <button id="reportPrint">Skriv ut</button>
+        <button id="reportClose">Stäng</button>
+      </div>
+    </div>
+    <div id="reportBody"></div>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="catalog.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

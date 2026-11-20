@@ -1304,12 +1304,14 @@ function initInspectorEvents() {
       }
       case 'del-net': {
         if (project.networks.length < 2) return;
-        if (!confirm(`Ta bort nätverket "${net().name}" med alla enheter?`)) return;
-        snapshot();
-        project.networks.splice(project.active, 1);
-        project.active = Math.max(0, project.active - 1);
-        selNodes.clear(); selLink = null;
-        changed();
+        askConfirm(`Ta bort nätverket "${net().name}" med alla enheter? Det går att ångra med Ctrl+Z.`, 'Ta bort', true).then(ok => {
+          if (!ok) return;
+          snapshot();
+          project.networks.splice(project.active, 1);
+          project.active = Math.max(0, project.active - 1);
+          selNodes.clear(); selLink = null;
+          changed();
+        });
         break;
       }
     }
@@ -1580,7 +1582,27 @@ function bomCsv() {
 }
 
 /* ---------------- Export / import ---------------- */
-function download(name, data, type) {
+/* I claude.ai-artefakter blockeras vanliga nedladdningslänkar; där används plattformens nedladdning. */
+let downloadsApi;
+function getDownloadsApi() {
+  if (downloadsApi === undefined) {
+    downloadsApi = (window.claude && typeof window.claude.use === 'function')
+      ? window.claude.use('downloads').catch(() => null)
+      : Promise.resolve(null);
+  }
+  return downloadsApi;
+}
+async function download(name, data, type) {
+  const api = await getDownloadsApi();
+  if (api) {
+    try {
+      await api.save({ filename: name, data: data instanceof Blob ? data : new Blob([data], { type }) });
+      toast(`${name} sparades.`);
+    } catch (err) {
+      if (err && err.code !== 'declined') toast(`Kunde inte spara filen (${err.code || 'okänt fel'}).`);
+    }
+    return;
+  }
   const blob = data instanceof Blob ? data : new Blob([data], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1629,7 +1651,7 @@ function importFile(file) {
       setTimeout(fitView, 0);
       toast(`Projektet "${p.name}" importerades.`);
     } catch (err) {
-      alert('Kunde inte importera: ' + err.message);
+      toast('Kunde inte importera: ' + err.message);
     }
   };
   r.readAsText(file);
@@ -1727,6 +1749,23 @@ function exampleProject() {
 }
 
 /* ---------------- Övrigt UI ---------------- */
+/* Egen bekräftelsedialog (confirm() fungerar inte överallt, t.ex. i inbäddade vyer). */
+function askConfirm(msg, okLabel = 'OK', danger = false) {
+  return new Promise(resolve => {
+    const dlg = $('#confirmDlg');
+    $('#confirmMsg').textContent = msg;
+    const ok = $('#confirmOk');
+    ok.textContent = okLabel;
+    ok.className = danger ? 'primary danger-fill' : 'primary';
+    const done = v => { dlg.close(); ok.onclick = null; $('#confirmCancel').onclick = null; dlg.oncancel = null; resolve(v); };
+    ok.onclick = () => done(true);
+    $('#confirmCancel').onclick = () => done(false);
+    dlg.oncancel = e => { e.preventDefault(); done(false); };
+    dlg.showModal();
+    ok.focus();
+  });
+}
+
 let toastTimer;
 function toast(msg) {
   const t = $('#toast');
@@ -1781,8 +1820,11 @@ function initTopbar() {
     $('.menu').open = false;
     switch (b.dataset.menu) {
       case 'new':
-        if (!confirm('Starta ett nytt tomt projekt? (Det nuvarande kan ångras med Ctrl+Z eller exporteras först.)')) return;
-        snapshot(); project = newProject(); selNodes.clear(); selLink = null; changed(); break;
+        askConfirm('Starta ett nytt tomt projekt? Det nuvarande går att få tillbaka med Ctrl+Z, eller exportera det först.', 'Nytt projekt').then(ok => {
+          if (!ok) return;
+          snapshot(); project = newProject(); selNodes.clear(); selLink = null; changed();
+        });
+        break;
       case 'example':
         snapshot(); project = exampleProject(); selNodes.clear(); selLink = null; changed(); setTimeout(fitView, 0); break;
       case 'import': $('#fileInput').click(); break;
@@ -1804,7 +1846,7 @@ function initTopbar() {
     if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return; }
     if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); exportJson(); return; }
-    if (typing || $('#reportDlg').open) return;
+    if (typing || $('#reportDlg').open || $('#confirmDlg').open) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); }
     else if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); }
     else if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selNodes = new Set(net().nodes.map(n => n.id)); selLink = null; render(); }
@@ -1825,6 +1867,7 @@ function load() {
 }
 
 const first = load();
+if (window.claude) $('#reportPrint').hidden = true; /* utskrift är inte tillgänglig i inbäddade vyer */
 renderPalette();
 initTopbar();
 initCanvasEvents();

@@ -5,6 +5,7 @@ Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.h
 ## 1.6.0 – 2026-11-21 (PR #9)
 - Ny färgpalett med 12 färger som är lättare att skilja åt: bara en grön, och vitt och svart har tillkommit.
 - Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.
+- Testläge: lägg till `#niva-300` i adressen för att prova valfri nivå utan att något sparas.
 
 ## 1.5.1 – 2026-11-21 (PR #8)
 - Appen på hemskärmen hämtar alltid senaste versionen och laddar om sig själv när en ny version finns.

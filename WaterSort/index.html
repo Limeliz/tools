@@ -47,6 +47,8 @@
   .title small::after { content: " ▾"; letter-spacing: 0; }
   .title b { font-size: 26px; font-weight: 800; }
   .title .best { font-size: 12px; opacity: .75; margin-top: 2px; white-space: nowrap; }
+  .testtag { display: inline-block; background: #ff4d6d; color: #fff; font-weight: 800; font-size: 11px; letter-spacing: .06em; padding: 1px 6px; border-radius: 6px; margin-right: 4px; }
+  .title.test .best { opacity: 1; }
   .title .best .st { color: #ffd60a; letter-spacing: 1px; }
   .title:active { opacity: .7; }
   .group { display: flex; gap: 8px; }
@@ -362,7 +364,8 @@
   const VERSIONS = [
     { v: '1.6.0', date: '2026-11-21', pr: 9, notes: [
       'Ny färgpalett med 12 färger som är lättare att skilja åt: bara en grön, och vitt och svart har tillkommit.',
-      'Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.'] },
+      'Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.',
+      'Testläge: lägg till #niva-300 i adressen för att prova valfri nivå utan att något sparas.'] },
     { v: '1.5.1', date: '2026-11-21', pr: 8, notes: [
       'Appen på hemskärmen hämtar alltid senaste versionen och laddar om sig själv när en ny version finns.'] },
     { v: '1.5.0', date: '2026-11-21', pr: 7, notes: [
@@ -658,7 +661,17 @@
   setInterval(showTimer, 100);
   document.addEventListener('visibilitychange', () => { if (!S) return; if (document.hidden) { timerPause(); save(); } else timerRun(); });
 
+  // Testläge: öppna spelet med #niva-300 (t.ex. .../WaterSort/#niva-300) för att prova en valfri nivå.
+  // Inget sparas i testläget: framsteg, rekord och extra rör påverkas inte.
+  const testLevel = (() => { const m = location.hash.match(/^#niva-(\d{1,6})$/); return m ? Math.max(1, +m[1]) : 0; })();
+  const testMode = testLevel > 0;
+  function exitTest() { location.hash = ''; location.reload(); }
+  window.addEventListener('hashchange', () => {
+    if (/^#niva-\d+$/.test(location.hash) || testMode) location.reload();
+  });
+
   function abandonAttempt() {
+    if (testMode) return;
     if (S && S.moves > 0 && !isSolved(S.tubes) && !records[S.level])
       attempts[S.level] = (attempts[S.level] || 0) + 1;
   }
@@ -675,8 +688,8 @@
       timeMs: 0, timeStarted: false, timeDone: false
     };
     sel = null; locked = false; hintPlan = null; timerStart = null;
-    maxLevel = Math.max(maxLevel, level);
-    if (level % TUBE_EVERY === 0 && level > awardedLevel) {
+    if (!testMode) maxLevel = Math.max(maxLevel, level);
+    if (!testMode && level % TUBE_EVERY === 0 && level > awardedLevel) {
       awardedLevel = level; extraTubes++;
       setTimeout(() => { toast(`Du fick ett extra rör! Du har nu ${extraTubes}.`); sfx.done(); }, 300);
     }
@@ -685,6 +698,7 @@
     layout(); render();
   }
   function save() {
+    if (testMode) return; // testläget sparar ingenting
     try {
       timerCommit();
       const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel, attempts };
@@ -998,7 +1012,9 @@
   function updateHud() {
     $('level').textContent = S.level;
     const r = records[S.level];
-    $('best').innerHTML = r ? `Bäst: <span class="st">${starStr(r.stars)}</span> ${r.moves} drag` + (r.time != null ? ` · ${fmtTime(r.time)}` : '') : '';
+    $('btnLevels').classList.toggle('test', testMode);
+    if (testMode) { $('best').innerHTML = '<span class="testtag">TEST</span>Avsluta'; }
+    else $('best').innerHTML = r ? `Bäst: <span class="st">${starStr(r.stars)}</span> ${r.moves} drag` + (r.time != null ? ` · ${fmtTime(r.time)}` : '') : '';
     $('undoCount').textContent = S.undos;
     $('hintCount').textContent = S.hints;
     $('tubeCount').textContent = extraTubes;
@@ -1318,27 +1334,32 @@
     const time = Math.round(S.timeMs);
     $('winText').textContent = `Nivå ${S.level} klar på ${S.moves} drag och ${fmtTime(time)}` +
       (S.minMoves != null ? ` · minsta möjliga: ${S.minMoves} drag` : '');
-    const prev = records[S.level];
-    const better = !prev || stars > prev.stars || (stars === prev.stars && S.moves < prev.moves);
-    const faster = !prev || prev.time == null || time < prev.time;
-    const rec = better ? { stars, moves: S.moves } : { stars: prev.stars, moves: prev.moves };
-    rec.time = faster ? time : prev.time;
-    // guldram: nivån har klarats utan hjälp (sparas bara från och med den här versionen)
-    if (noHelp || (prev && prev.clean)) rec.clean = true;
-    // antal försök sparas bara första gången nivån klaras
-    if (!prev) { rec.tries = (attempts[S.level] || 0) + 1; delete attempts[S.level]; }
-    else if (prev.tries != null) rec.tries = prev.tries;
-    records[S.level] = rec;
-    $('winTries').textContent = !prev
-      ? (rec.tries === 1 ? 'Klarad på första försöket!' : `Klarad efter ${rec.tries} försök`)
-      : (rec.tries != null ? `Första gången krävdes ${triesText(rec.tries)}` : '');
-    const msgs = [];
-    if (prev && better) msgs.push('Nytt rekord!');
-    if (prev && prev.time != null && faster) msgs.push('Ny snabbaste tid!');
-    if (prev && !better) msgs.push(`Ditt bästa: ${starStr(prev.stars)} ${prev.moves} drag`);
-    if (prev && prev.time != null && !faster) msgs.push(`Snabbast: ${fmtTime(prev.time)}`);
-    $('winRecord').textContent = msgs.join(' · ');
-    maxLevel = Math.max(maxLevel, S.level + 1);
+    if (testMode) {
+      $('winTries').textContent = '';
+      $('winRecord').textContent = 'Testläge – resultatet sparas inte';
+    } else {
+      const prev = records[S.level];
+      const better = !prev || stars > prev.stars || (stars === prev.stars && S.moves < prev.moves);
+      const faster = !prev || prev.time == null || time < prev.time;
+      const rec = better ? { stars, moves: S.moves } : { stars: prev.stars, moves: prev.moves };
+      rec.time = faster ? time : prev.time;
+      // guldram: nivån har klarats utan hjälp (sparas bara från och med den här versionen)
+      if (noHelp || (prev && prev.clean)) rec.clean = true;
+      // antal försök sparas bara första gången nivån klaras
+      if (!prev) { rec.tries = (attempts[S.level] || 0) + 1; delete attempts[S.level]; }
+      else if (prev.tries != null) rec.tries = prev.tries;
+      records[S.level] = rec;
+      $('winTries').textContent = !prev
+        ? (rec.tries === 1 ? 'Klarad på första försöket!' : `Klarad efter ${rec.tries} försök`)
+        : (rec.tries != null ? `Första gången krävdes ${triesText(rec.tries)}` : '');
+      const msgs = [];
+      if (prev && better) msgs.push('Nytt rekord!');
+      if (prev && prev.time != null && faster) msgs.push('Ny snabbaste tid!');
+      if (prev && !better) msgs.push(`Ditt bästa: ${starStr(prev.stars)} ${prev.moves} drag`);
+      if (prev && prev.time != null && !faster) msgs.push(`Snabbast: ${fmtTime(prev.time)}`);
+      $('winRecord').textContent = msgs.join(' · ');
+      maxLevel = Math.max(maxLevel, S.level + 1);
+    }
     save(); updateHud();
     $('overlay').classList.add('show');
     confetti();
@@ -1388,8 +1409,8 @@
     const L = +b.dataset.level;
     if (L !== S.level || S.moves) newGame(L);
   });
-  $('btnLevels').addEventListener('click', openLevels);
-  $('btnWinLevels').addEventListener('click', openLevels);
+  $('btnLevels').addEventListener('click', () => testMode ? exitTest() : openLevels());
+  $('btnWinLevels').addEventListener('click', () => testMode ? exitTest() : openLevels());
   $('btnHelp').addEventListener('click', () => openSheet('helpSheet'));
   $('versionText').textContent = `Version ${VERSION} (${VERSIONS[0].date})`;
   $('versionHistory').innerHTML = VERSIONS.map(x =>
@@ -1468,7 +1489,10 @@
     musicOn = saved.music !== false;
     updateAudioButtons();
     layout(); render();
-    if (isSolved(S.tubes)) newGame(S.level + 1); else timerRun();
+    if (testMode) { extraTubes = 3; newGame(testLevel); toast(`Testläge: nivå ${testLevel}. Inget sparas.`); }
+    else if (isSolved(S.tubes)) newGame(S.level + 1); else timerRun();
+  } else if (testMode) {
+    extraTubes = 3; newGame(testLevel); toast(`Testläge: nivå ${testLevel}. Inget sparas.`);
   } else {
     newGame(1);
   }

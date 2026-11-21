@@ -29,3 +29,9 @@ Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHu
 - Tryck på nivånumret för att se alla upplåsta nivåer med ditt bästa resultat och spela dem igen.
 - Hjälpsidan (frågetecknet) förklarar regler, snabbknep, hjälpmedel och betyg.
 - Framstegen sparas automatiskt i webbläsaren.
+
+## Ljud
+
+- `sounds/nice.mp3` och `sounds/perfect.mp3` är rösterna som spelas när du klarar en nivå. De är inbäddade i `index.html`, så spelet fungerar som en enda fil. Byter du ut filerna behöver de bäddas in på nytt (base64 i `VOICE_B64`).
+- Rösterna är skapade med talsyntesen [Piper](https://github.com/OHF-Voice/piper1-gpl) och rösten `en_US-libritts_r-medium` (talare 20). Den är tränad på datamängden [LibriTTS-R](http://www.openslr.org/141/), licens CC BY 4.0.
+- Bakgrundsmusiken och övriga ljudeffekter genereras av spelet självt med Web Audio.

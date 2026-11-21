@@ -515,6 +515,13 @@
     if (canPour(S.tubes, sel, i)) {
       lastPour = { i: sel, j: i, t: performance.now() };
       pour(sel, i);
+    } else if (S.tubes[i].length === CAP && !isComplete(S.tubes[i]) && canPour(S.tubes, i, sel)) {
+      // Målet är fullt med samma färg överst: spelaren har troligen tryckt i fel ordning,
+      // så häll åt andra hållet (från det fulla röret till det valda)
+      const old = tubeEl(sel); old && old.classList.remove('sel');
+      const into = sel;
+      lastPour = null;
+      pour(i, into);
     } else {
       sfx.bad(); shake(el);
       const old = tubeEl(sel); old && old.classList.remove('sel');

@@ -31,7 +31,7 @@ Lägg till `#niva-` och ett nummer i adressen för att prova en valfri nivå, ti
 - Klarar du en nivå utan hjälp (ångra, tips, extra rör) säger spelet "Nice!". Klarar du den dessutom på minsta möjliga antal drag säger det "Perfect!". Minsta antal drag räknas fram i bakgrunden när nivån startar.
 - Lugn lo-fi-bakgrundsmusik som spelet själv komponerar och spelar upp i realtid, så den är helt fri från royalty. Musiken och ljudeffekterna stängs av med var sin knapp.
 - Tiden räknas från första hällningen tills nivån är klar. Tryck på nivånumret för att se alla upplåsta nivåer med ditt bästa betyg, antal drag, snabbaste tid och hur många försök du behövde första gången, och spela dem igen. Nivåer som klarats utan hjälp får en guldram.
-- Hjälpsidan (frågetecknet) förklarar regler, snabbknep, hjälpmedel och betyg.
+- Hjälpsidan (frågetecknet) förklarar regler, snabbknep, hjälpmedel och betyg. Där väljer du också färgschema: Standard, Paired (ColorBrewer Paired-12) eller Original.
 - Framstegen sparas automatiskt i webbläsaren.
 
 ## Ljud

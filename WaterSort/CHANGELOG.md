@@ -2,6 +2,9 @@
 
 Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.html` och visas längst ned på spelets hjälpsida.
 
+## 1.7.0 – 2026-11-21 (PR #10)
+- Välj färgschema på hjälpsidan: Standard, Paired (ColorBrewer Paired-12) eller Original från version 1.0.
+
 ## 1.6.0 – 2026-11-21 (PR #9)
 - Ny färgpalett med 12 färger som är lättare att skilja åt: bara en grön, ljusrosa i stället för rosa, och vitt och svart har tillkommit.
 - Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.

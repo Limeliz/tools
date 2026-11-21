@@ -210,6 +210,17 @@
   .lvl.gold { border-color: #ffd60a; background: linear-gradient(160deg, rgba(255,214,10,.22), rgba(255,255,255,.08)); }
   .lvl.gold:not(.current) { box-shadow: 0 0 14px rgba(255,214,10,.4), 0 4px 10px rgba(0,0,0,.25); }
   .help .version { opacity: .8; }
+  .schemes { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+  .scheme {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; text-align: left;
+    background: var(--btn); border-radius: 14px; padding: 10px 12px; border: 2px solid transparent;
+  }
+  .scheme.on { border-color: #5ee7ff; }
+  .scheme b { font-size: 15px; }
+  .scheme .check { font-size: 13px; color: #5ee7ff; font-weight: 700; }
+  .scheme .sw { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+  .scheme .sw i { height: 22px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  .scheme small { grid-column: 1 / -1; opacity: .75; font-size: 12px; }
   .help details.history { margin: 4px 0 8px; }
   .help details.history summary { cursor: pointer; color: #9fd8ff; font-weight: 700; padding: 6px 0; }
   .help .ver { margin: 10px 0 4px; font-weight: 700; }
@@ -340,6 +351,10 @@
       </ul>
       <p>Överst i listan ser du hur många nivåer du låst upp, hur många stjärnor du samlat och hur många nivåer du klarat utan hjälp och perfekt.</p>
 
+      <h3>Färger</h3>
+      <p>Välj det färgschema som är lättast för dig att skilja åt. Valet gäller direkt, även mitt i en nivå.</p>
+      <div class="schemes" id="schemeList"></div>
+
       <h3>Ljud och musik</h3>
       <p>Not-knappen stänger av eller sätter på bakgrundsmusiken. Högtalarknappen stänger av eller sätter på ljudeffekterna och vinstljuden. Musiken startar när du rör skärmen första gången, pausas när du lämnar appen och sänks medan ett vinstljud spelas.</p>
 
@@ -362,6 +377,8 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.7.0', date: '2026-11-21', pr: 10, notes: [
+      'Välj färgschema på hjälpsidan: Standard, Paired (ColorBrewer Paired-12) eller Original från version 1.0.'] },
     { v: '1.6.0', date: '2026-11-21', pr: 9, notes: [
       'Ny färgpalett med 12 färger som är lättare att skilja åt: bara en grön, ljusrosa i stället för rosa, och vitt och svart har tillkommit.',
       'Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.',
@@ -397,29 +414,31 @@
   const CAP = 4;
   const UNDOS = 5, HINTS = 3;
   const TUBE_EVERY = 5;       // ett extra rör första gången man når nivå 5, 10, 15 …
-  // 12 färger valda för största möjliga skillnad (minsta ΔE2000 mellan två färger: 20,0)
-  // och tydlig kontrast mot bakgrunden. Bara en grön.
-  const PALETTE = [
-    '#e8262f', // röd
-    '#3a66ff', // blå
-    '#22b14c', // grön
-    '#ffe11a', // gul
-    '#c03cff', // lila
-    '#ff8a00', // orange
-    '#ffa8d8', // ljusrosa (tydligt ljusare än röd)
-    '#3fd7f5', // turkos
-    '#ffffff', // vit
-    '#7a4416', // brun
-    '#8a8f99', // grå
-    '#000000'  // svart
+  // Färgscheman. Alla har 12 färger; spelet lagrar bara färgens nummer (0–11),
+  // så schemat kan bytas när som helst. Väljs på hjälpsidan.
+  const NCOLORS = 12;
+  const SCHEMES = [
+    { id: 'standard', name: 'Standard', desc: 'Version 1.6. Valda för största skillnad, bara en grön.', colors: [
+      '#e8262f', '#3a66ff', '#22b14c', '#ffe11a', '#c03cff', '#ff8a00',
+      '#ffa8d8', '#3fd7f5', '#ffffff', '#7a4416', '#8a8f99', '#000000'] },
+    { id: 'paired', name: 'Paired', desc: 'ColorBrewer Paired-12: sex färgpar i ljus och mörk ton.', colors: [
+      '#e31a1c', '#1f78b4', '#33a02c', '#ffff99', '#6a3d9a', '#ff7f00',
+      '#fb9a99', '#a6cee3', '#cab2d6', '#b15928', '#fdbf6f', '#b2df8a'] },
+    { id: 'original', name: 'Original', desc: 'Färgerna från version 1.0 (de första 12 av 14).', colors: [
+      '#ff3b47', '#2f7bff', '#2ecc52', '#ffd60a', '#a64dff', '#ff8c1a',
+      '#ff6ec7', '#28d7f0', '#9be33a', '#8b5a2b', '#9aa3b2', '#1d3c99'] }
   ];
+  const SCHEME_KEY = 'vattensortering.scheme';
+  let schemeId = 'standard';
+  try { const v = localStorage.getItem(SCHEME_KEY); if (SCHEMES.some(x => x.id === v)) schemeId = v; } catch (e) {}
+  let PALETTE = SCHEMES.find(x => x.id === schemeId).colors;
   // Nivågeneratorn väljer bland 14 färgplatser (som i tidigare versioner) så att alla nivåer
   // behåller exakt samma upplägg. Platser utan egen färg byts mot en färg som nivån inte använder.
   const SLOTS = 14;
   function colorMapFor(tubes) {
     const used = new Set(tubes.flat());
-    const free = [...PALETTE.keys()].filter(c => !used.has(c));
-    const high = [...used].filter(c => c >= PALETTE.length).sort((a, b) => a - b);
+    const free = [...Array(NCOLORS).keys()].filter(c => !used.has(c));
+    const high = [...used].filter(c => c >= NCOLORS).sort((a, b) => a - b);
     const map = new Map(high.map((c, k) => [c, free[k]]));
     return t => t.map(a => a.map(c => map.has(c) ? map.get(c) : c));
   }
@@ -1412,6 +1431,22 @@
   $('btnLevels').addEventListener('click', () => testMode ? exitTest() : openLevels());
   $('btnWinLevels').addEventListener('click', () => testMode ? exitTest() : openLevels());
   $('btnHelp').addEventListener('click', () => openSheet('helpSheet'));
+  function renderSchemes() {
+    $('schemeList').innerHTML = SCHEMES.map(x =>
+      `<button class="scheme${x.id === schemeId ? ' on' : ''}" data-scheme="${x.id}">` +
+      `<b>${x.name}</b><span class="check">${x.id === schemeId ? 'Vald' : ''}</span>` +
+      `<span class="sw">${x.colors.map(c => `<i style="background:${c}"></i>`).join('')}</span>` +
+      `<small>${x.desc}</small></button>`).join('');
+  }
+  renderSchemes();
+  $('schemeList').addEventListener('click', e => {
+    const b = e.target.closest('.scheme'); if (!b || anims) return;
+    schemeId = b.dataset.scheme;
+    PALETTE = SCHEMES.find(x => x.id === schemeId).colors;
+    try { localStorage.setItem(SCHEME_KEY, schemeId); } catch (err) {}
+    renderSchemes(); render(); sfx.pick();
+    toast(`Färgschema: ${SCHEMES.find(x => x.id === schemeId).name}`);
+  });
   $('versionText').textContent = `Version ${VERSION} (${VERSIONS[0].date})`;
   $('versionHistory').innerHTML = VERSIONS.map(x =>
     `<p class="ver">${x.v}<small>${x.date} · PR #${x.pr}</small></p><ul>${x.notes.map(n => `<li>${n}</li>`).join('')}</ul>`).join('');
@@ -1473,7 +1508,7 @@
       timeMs: saved.timeMs || 0, timeStarted: !!saved.timeStarted, timeDone: !!saved.timeDone
     };
     // sparat läge från en version med 14 färger: byt färger som inte längre finns
-    if (S.initial.flat().some(c => c >= PALETTE.length)) {
+    if (S.initial.flat().some(c => c >= NCOLORS)) {
       const m = colorMapFor(S.initial);
       S.tubes = m(S.tubes); S.initial = m(S.initial); S.history = S.history.map(m);
     }

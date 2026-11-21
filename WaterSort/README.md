@@ -34,3 +34,7 @@ Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHu
 
 - `sounds/no-help.mp3` spelas när du klarar en nivå utan hjälp (Nice!) och `sounds/perfect-score.mp3` när du klarar den på minsta antal drag (Perfect!). De är inbäddade i `index.html`, så spelet fungerar som en enda fil. Byter du ut filerna behöver de bäddas in på nytt (base64 i `VOICE_B64`).
 - Bakgrundsmusiken och övriga ljudeffekter genereras av spelet självt med Web Audio.
+
+## Versioner
+
+Se [CHANGELOG.md](CHANGELOG.md). Versionen och historiken visas också längst ned på spelets hjälpsida.

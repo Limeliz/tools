@@ -39,9 +39,16 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px 4px; gap: 8px;
   }
-  .title { display: flex; flex-direction: column; line-height: 1.1; }
+  .title {
+    display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;
+    background: none; padding: 4px 8px 4px 0; text-align: left; min-width: 0;
+  }
   .title small { opacity: .6; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  .title small::after { content: " ▾"; letter-spacing: 0; }
   .title b { font-size: 26px; font-weight: 800; }
+  .title .best { font-size: 12px; opacity: .75; margin-top: 2px; white-space: nowrap; }
+  .title .best .st { color: #ffd60a; letter-spacing: 1px; }
+  .title:active { opacity: .7; }
   .group { display: flex; gap: 8px; }
   button {
     font: inherit; color: inherit; border: none; cursor: pointer;
@@ -79,6 +86,7 @@
     0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); }
     40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
   }
+  .tube.locked .glass { box-shadow: 0 0 0 3px #5ee7ff, 0 0 20px #5ee7ff; }
   .tube.hint .glass { box-shadow: 0 0 0 3px #ffe066, 0 0 22px #ffe066; }
   .body::before { /* rim */
     content: ""; position: absolute; top: -5px; left: -6px; right: -6px; height: 8px;
@@ -147,12 +155,57 @@
   .bigbtn:active { transform: translateY(4px); box-shadow: 0 1px 0 #17803a; }
   .linkbtn { background: none; margin-top: 14px; opacity: .75; font-size: 15px; text-decoration: underline; }
   #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 55; }
+  .card .record { margin: -12px 0 18px; font-size: 14px; font-weight: 700; color: #ffd60a; min-height: 1em; }
+  .card .linkbtn + .linkbtn { margin-left: 14px; }
+
+  /* Helskärmsblad: hjälp och nivåväljare */
+  .sheet {
+    position: fixed; inset: 0; z-index: 70; display: none; flex-direction: column;
+    background: radial-gradient(ellipse at 50% 0%, #3d43a0 0%, #1f1d55 55%, #0d0b25 100%); background-color: #1d1b4a;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  }
+  .sheet.show { display: flex; animation: sheetIn .25s ease-out; }
+  @keyframes sheetIn { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; gap: 12px; }
+  .sheet-head h2 { margin: 0; font-size: 24px; }
+  .scroll {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 4px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  .scroll, .scroll * { touch-action: pan-y; }
+  .help { max-width: 560px; margin: 0 auto; line-height: 1.5; font-size: 15px; }
+  .help h3 { margin: 22px 0 6px; font-size: 17px; color: #9fd8ff; }
+  .help p, .help ul { margin: 0 0 8px; }
+  .help ul { padding-left: 20px; }
+  .help li { margin-bottom: 4px; }
+  .help .aid { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: start; margin: 10px 0; }
+  .help .aid svg { width: 40px; height: 40px; padding: 8px; border-radius: 12px; background: var(--btn); stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .help .aid b { display: block; }
+  .help table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; font-size: 14px; }
+  .help td { padding: 6px 4px; border-top: 1px solid rgba(255,255,255,.12); vertical-align: top; }
+  .help td:first-child { color: #ffd60a; white-space: nowrap; padding-right: 10px; }
+  .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; max-width: 560px; margin: 0 auto; }
+  .lvl {
+    aspect-ratio: 1; border-radius: 16px; background: var(--btn); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px; padding: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 4px 10px rgba(0,0,0,.25);
+  }
+  .lvl:active { transform: scale(.94); }
+  .lvl b { font-size: 20px; }
+  .lvl .st { font-size: 11px; color: #ffd60a; letter-spacing: 1px; }
+  .lvl small { font-size: 10px; opacity: .7; }
+  .lvl.current { box-shadow: 0 0 0 2px #5ee7ff, 0 4px 10px rgba(0,0,0,.25); }
+  .lvl.new { background: linear-gradient(160deg, #5eea7d, #23b14a); }
+  .levels-sum { max-width: 560px; margin: 0 auto 14px; opacity: .8; font-size: 14px; }
 </style>
 </head>
 <body>
   <header>
-    <div class="title"><small>Nivå</small><b id="level">1</b></div>
+    <button class="title" id="btnLevels" aria-label="Välj nivå"><small>Nivå</small><b id="level">1</b><span class="best" id="best"></span></button>
     <div class="group">
+      <button class="iconbtn" id="btnHelp" aria-label="Hjälp">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4.1"/><path d="M12 17.6v.1"/></svg>
+      </button>
       <button class="iconbtn" id="btnMusic" aria-label="Musik">
         <svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path id="musicSlash" d="M3 3l18 18" style="display:none"/></svg>
       </button>
@@ -190,10 +243,75 @@
       <div class="stars">★★★</div>
       <h2 id="winTitle">Snyggt!</h2>
       <p id="winText">Nivå 1 klar</p>
+      <div class="record" id="winRecord"></div>
       <button class="bigbtn" id="btnNext">Nästa nivå</button>
-      <button class="linkbtn" id="btnReplay">Spela nivån igen</button>
+      <button class="linkbtn" id="btnReplay">Spela igen</button><button class="linkbtn" id="btnWinLevels">Alla nivåer</button>
     </div>
   </div>
+
+  <section class="sheet" id="levelsSheet" aria-label="Nivåer">
+    <div class="sheet-head"><h2>Nivåer</h2><button class="iconbtn" data-close aria-label="Stäng"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="scroll">
+      <p class="levels-sum" id="levelsSum"></p>
+      <div class="levels" id="levelsGrid"></div>
+    </div>
+  </section>
+
+  <section class="sheet" id="helpSheet" aria-label="Hjälp">
+    <div class="sheet-head"><h2>Så spelar du</h2><button class="iconbtn" data-close aria-label="Stäng"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="scroll"><div class="help">
+      <h3>Målet</h3>
+      <p>Sortera färgerna så att varje rör bara innehåller en enda färg. Ett rör rymmer fyra lager. När ett rör är fullt med samma färg får det en kork, och när alla rör är sorterade är nivån klar.</p>
+
+      <h3>Så häller du</h3>
+      <ul>
+        <li>Tryck på ett rör för att lyfta det. Tryck sedan på röret du vill hälla i.</li>
+        <li>Du får bara hälla på samma färg eller i ett tomt rör.</li>
+        <li>All färg av samma sort överst följer med, så länge det finns plats. Resten blir kvar.</li>
+        <li>Tryck på det lyfta röret igen för att ställa ner det.</li>
+        <li>Om hällningen inte går skakar röret.</li>
+      </ul>
+
+      <h3>Snabbknep</h3>
+      <ul>
+        <li><b>Dubbeltryck på röret du häller från</b> så låses det och får en blå ring. Då är det fortfarande valt efter varje hällning, så du kan hälla i flera rör i rad. Låsningen släpper när röret är tomt eller färdigt, eller när du trycker på det igen.</li>
+        <li><b>Du behöver inte vänta</b> på att en hällning blir klar. Flera rör kan hälla samtidigt.</li>
+        <li><b>Fel ordning?</b> Om du väljer ett rör och trycker på ett fullt rör med samma färg överst, hälls det åt andra hållet, från det fulla röret till det du valde.</li>
+      </ul>
+
+      <h3>Hjälpmedel</h3>
+      <div class="aid">
+        <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        <div><b>Ångra – 5 per nivå</b>Tar tillbaka ditt senaste drag. Varje ångrat drag förbrukar en ångring.</div>
+      </div>
+      <div class="aid">
+        <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+        <div><b>Tips – 3 per nivå</b>Lyfter rätt rör och får röret du ska hälla i att lysa gult. Varje tips förbrukar ett.</div>
+      </div>
+      <div class="aid">
+        <svg viewBox="0 0 24 24"><path d="M8 3v13a4 4 0 0 0 8 0V3"/><path d="M6 3h12"/><path d="M12 8v6M9 11h6"/></svg>
+        <div><b>Extra rör – 1 per nivå</b>Lägger till ett tomt rör som ger mer utrymme. Det finns kvar resten av nivån.</div>
+      </div>
+      <p>Siffran på knappen visar hur många du har kvar. <b>Så får du fler:</b> alla hjälpmedel fylls på igen när du börjar en ny nivå, spelar en gammal nivå igen eller trycker på <i>Börja om</i> (pilen uppe till höger), som också startar om nivån från början. Det finns inget sätt att spara oanvända hjälpmedel till senare.</p>
+
+      <h3>Betyg</h3>
+      <table>
+        <tr><td>★★★ Perfect!</td><td>Klarad utan hjälpmedel och på minsta möjliga antal drag.</td></tr>
+        <tr><td>★★☆ Nice!</td><td>Klarad utan att ångra, ta tips eller lägga till ett extra rör.</td></tr>
+        <tr><td>★☆☆ Klart!</td><td>Klarad med hjälp.</td></tr>
+      </table>
+      <p>När nivån är klar ser du hur många drag du använde och hur få drag som var möjligt.</p>
+
+      <h3>Spela gamla nivåer</h3>
+      <p>Tryck på nivånumret uppe till vänster för att se alla nivåer du har låst upp, med ditt bästa betyg och antal drag. Tryck på en nivå för att spela den igen och försöka förbättra resultatet. Ditt bästa resultat visas under nivånumret medan du spelar. Den nivå du var mitt i startar om från början om du byter nivå.</p>
+
+      <h3>Ljud och musik</h3>
+      <p>Not-knappen stänger av eller sätter på bakgrundsmusiken. Högtalarknappen styr ljudeffekterna och rösten. Musiken startar när du rör skärmen första gången.</p>
+
+      <h3>Sparat</h3>
+      <p>Allt sparas automatiskt i webbläsaren på den här enheten: nivån du spelar, upplåsta nivåer, dina bästa resultat och ljudinställningar.</p>
+    </div></div>
+  </section>
 
 <script>
 (() => {
@@ -420,6 +538,9 @@
   let pendingLayout = false;
   let sound = true;
   let musicOn = true;
+  let maxLevel = 1;          // högsta upplåsta nivå
+  let records = {};          // nivå -> { stars, moves }
+  let locked = false;        // valt rör är låst med dubbeltryck
 
   function newGame(level) {
     const tubes = generateLevel(level);
@@ -427,14 +548,15 @@
       level, tubes, initial: clone(tubes), history: [],
       undos: UNDOS, hints: HINTS, extra: EXTRA, moves: 0, minMoves: null
     };
-    sel = null; hintPlan = null;
+    sel = null; locked = false; hintPlan = null;
+    maxLevel = Math.max(maxLevel, level);
     computeMinMoves();
     save();
     layout(); render();
   }
   function save() {
     try {
-      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn };
+      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records };
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
     } catch (e) { /* ignoreras */ }
   }
@@ -480,6 +602,7 @@
     pick: () => tone(520, .08, 'sine', .08),
     pour: n => { for (let k = 0; k < n; k++) tone(260 + k * 70, .09, 'sine', .12, 520 + k * 90, k * .075); },
     bad: () => tone(160, .15, 'square', .05),
+    lock: () => { tone(520, .07, 'sine', .08); tone(780, .1, 'sine', .08, null, .07); },
     done: () => { tone(660, .12, 'triangle', .12); tone(990, .2, 'triangle', .12, null, .1); },
     win: () => [523, 659, 784, 1047].forEach((f, k) => tone(f, .3, 'triangle', .14, null, k * .12)),
     perfect: () => {
@@ -741,8 +864,11 @@
     });
     updateHud();
   }
+  const starStr = n => '★'.repeat(n) + '☆'.repeat(3 - n);
   function updateHud() {
     $('level').textContent = S.level;
+    const r = records[S.level];
+    $('best').innerHTML = r ? `Bäst: <span class="st">${starStr(r.stars)}</span> ${r.moves} drag` : '';
     $('undoCount').textContent = S.undos;
     $('hintCount').textContent = S.hints;
     $('tubeCount').textContent = S.extra;
@@ -756,6 +882,7 @@
     const a = S.tubes[i];
     tube.classList.toggle('done', isComplete(a));
     tube.classList.toggle('sel', sel === i);
+    tube.classList.toggle('locked', locked && sel === i);
     const slots = tube.querySelectorAll('.slot');
     slots.forEach((slot, k) => {
       slot.classList.toggle('top', k === a.length - 1);
@@ -776,51 +903,59 @@
   }
 
   // ---------- Interaktion ----------
-  // Dubbeltryck: ett andra tryck på samma målrör strax efter en hällning håller källröret markerat
+  // Dubbeltryck på källröret låser det: det förblir valt efter varje hällning
   const DOUBLE_TAP_MS = 400;
-  let lastPour = null;
+  let lastSelTap = { i: -1, t: 0 };
+  function setSelClasses(i, on) {
+    const t = tubeEl(i); if (!t) return;
+    t.classList.toggle('sel', on);
+    t.classList.toggle('locked', on && locked);
+  }
 
   // pointerdown reagerar direkt på både Android och iOS (ingen klickfördröjning)
   board.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     const el = e.target.closest('.tube');
-    if (el && lastPour && +el.dataset.i === lastPour.j && performance.now() - lastPour.t < DOUBLE_TAP_MS) {
-      const src = lastPour.i;
-      lastPour = null;
-      const a = S.tubes[src];
-      if (sel === null && a.length && !isComplete(a)) {
-        sel = src;
-        const t = tubeEl(src); t && t.classList.add('sel'); // lyfts när röret landat
-        sfx.pick(); buzz(8);
-      }
-      return;
-    }
-    lastPour = null;
-    if (!el) { if (sel !== null) { const o = tubeEl(sel); sel = null; o && o.classList.remove('sel'); } return; }
+    const now = performance.now();
+    if (!el) { if (sel !== null) { const o = sel; sel = null; locked = false; setSelClasses(o, false); } return; }
     const i = +el.dataset.i;
     clearHint();
     if (sel === null) {
       const a = S.tubes[i];
       if (!a.length || isComplete(a)) { shake(el); return; }
-      sel = i; el.classList.add('sel'); sfx.pick(); buzz(8);
+      sel = i; locked = false; setSelClasses(i, true); sfx.pick(); buzz(8);
+      lastSelTap = { i, t: now };
       return;
     }
-    if (sel === i) { el.classList.remove('sel'); sel = null; return; }
+    if (sel === i) {
+      if (!locked && lastSelTap.i === i && now - lastSelTap.t < DOUBLE_TAP_MS) {
+        locked = true; setSelClasses(i, true);
+        sfx.lock(); buzz([10, 30, 10]);
+        return;
+      }
+      sel = null; locked = false; setSelClasses(i, false);
+      return;
+    }
+    lastSelTap = { i: -1, t: 0 };
     if (canPour(S.tubes, sel, i)) {
-      lastPour = { i: sel, j: i, t: performance.now() };
-      pour(sel, i);
+      const src = sel, keep = locked;
+      pour(src, i); // uppdaterar tillståndet direkt och nollställer valet
+      const a = S.tubes[src];
+      if (keep && a.length && !isComplete(a)) {
+        sel = src; locked = true; setSelClasses(src, true); // lyfts igen när röret landat
+      }
     } else if (S.tubes[i].length === CAP && !isComplete(S.tubes[i]) && canPour(S.tubes, i, sel)) {
       // Målet är fullt med samma färg överst: spelaren har troligen tryckt i fel ordning,
       // så häll åt andra hållet (från det fulla röret till det valda)
-      const old = tubeEl(sel); old && old.classList.remove('sel');
       const into = sel;
-      lastPour = null;
+      setSelClasses(into, false);
       pour(i, into);
     } else {
       sfx.bad(); shake(el);
-      const old = tubeEl(sel); old && old.classList.remove('sel');
-      sel = null;
+      const o = sel;
+      sel = null; locked = false;
+      setSelClasses(o, false);
     }
   });
 
@@ -842,7 +977,7 @@
     if (S.history.length > 30) S.history.shift();
     for (let k = 0; k < cnt; k++) t[j].push(t[i].pop());
     S.moves++;
-    sel = null;
+    sel = null; locked = false;
     save();
     updateHud();
 
@@ -945,7 +1080,7 @@
     if (!S.history.length) { toast('Inget att ångra'); return; }
     if (!S.undos) { toast('Inga ångringar kvar på den här nivån'); return; }
     S.tubes = S.history.pop();
-    S.undos--; sel = null; clearHint();
+    S.undos--; sel = null; locked = false; clearHint();
     layout(); render(); save(); sfx.pick();
   });
 
@@ -953,7 +1088,7 @@
     if (anims) return;
     S.tubes = clone(S.initial); S.history = [];
     S.undos = UNDOS; S.hints = HINTS; S.extra = EXTRA; S.moves = 0;
-    sel = null; clearHint();
+    sel = null; locked = false; clearHint();
     layout(); render(); save();
     toast('Nivån startades om');
   });
@@ -964,7 +1099,7 @@
     S.extra--;
     S.tubes.push([]);
     S.history.forEach(h => h.push([]));
-    sel = null; clearHint();
+    sel = null; locked = false; clearHint();
     layout(); render(); save(); sfx.done();
   });
 
@@ -1001,7 +1136,7 @@
     if (!move) { toast('Hittar ingen lösning härifrån – prova att ångra'); return; }
     S.hints--;
     const [i, j] = move;
-    sel = i; // lyft källröret, markera målet
+    sel = i; locked = false; // lyft källröret, markera målet
     render(); save();
     hinted = [j];
     tubeEl(j).classList.add('hint');
@@ -1041,6 +1176,13 @@
     $('winTitle').textContent = perfect ? 'Perfect!' : noHelp ? 'Nice!' : 'Klart!';
     $('winText').textContent = `Nivå ${S.level} klar på ${S.moves} drag` +
       (S.minMoves != null ? ` · minsta möjliga: ${S.minMoves}` : '');
+    const prev = records[S.level];
+    const better = !prev || stars > prev.stars || (stars === prev.stars && S.moves < prev.moves);
+    if (better) records[S.level] = { stars, moves: S.moves };
+    $('winRecord').textContent = !prev ? '' : better ? 'Nytt rekord!'
+      : `Ditt bästa: ${starStr(prev.stars)} ${prev.moves} drag`;
+    maxLevel = Math.max(maxLevel, S.level + 1);
+    save(); updateHud();
     $('overlay').classList.add('show');
     confetti();
   }
@@ -1052,6 +1194,45 @@
     $('overlay').classList.remove('show');
     newGame(S.level);
   });
+
+  // ---------- Hjälp och nivåväljare ----------
+  function openSheet(id) {
+    document.querySelectorAll('.sheet.show').forEach(x => x.classList.remove('show'));
+    const sh = $(id); sh.classList.add('show');
+    sh.querySelector('.scroll').scrollTop = 0;
+  }
+  document.querySelectorAll('.sheet [data-close]').forEach(b =>
+    b.addEventListener('click', () => b.closest('.sheet').classList.remove('show')));
+
+  function openLevels() {
+    if (anims) return;
+    const grid = $('levelsGrid');
+    grid.innerHTML = '';
+    let stars = 0, perfect = 0;
+    for (let L = 1; L <= maxLevel; L++) {
+      const r = records[L];
+      if (r) { stars += r.stars; if (r.stars === 3) perfect++; }
+      const b = document.createElement('button');
+      b.className = 'lvl' + (L === S.level ? ' current' : '') + (!r ? ' new' : '');
+      b.dataset.level = L;
+      b.innerHTML = `<b>${L}</b>` + (r ? `<span class="st">${starStr(r.stars)}</span><small>${r.moves} drag</small>` : '<small>Ny</small>');
+      grid.appendChild(b);
+    }
+    $('levelsSum').textContent = `${maxLevel} nivåer upplåsta · ${stars} av ${maxLevel * 3} stjärnor · ${perfect} perfekta`;
+    openSheet('levelsSheet');
+    const cur = grid.querySelector('.current');
+    if (cur) cur.scrollIntoView({ block: 'center' });
+  }
+  $('levelsGrid').addEventListener('click', e => {
+    const b = e.target.closest('.lvl'); if (!b) return;
+    $('levelsSheet').classList.remove('show');
+    $('overlay').classList.remove('show');
+    const L = +b.dataset.level;
+    if (L !== S.level || S.moves) newGame(L);
+  });
+  $('btnLevels').addEventListener('click', openLevels);
+  $('btnWinLevels').addEventListener('click', openLevels);
+  $('btnHelp').addEventListener('click', () => openSheet('helpSheet'));
 
   function confetti() {
     const c = $('confetti'), ctx = c.getContext('2d');
@@ -1084,7 +1265,11 @@
   const stop = e => e.preventDefault();
   ['gesturestart', 'gesturechange', 'gestureend', 'dblclick', 'contextmenu', 'selectstart'].forEach(t =>
     document.addEventListener(t, stop, { passive: false }));
-  document.addEventListener('touchmove', stop, { passive: false });
+  // selectstart stoppas ovan; dblclick likaså
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && e.target.closest('.scroll')) return; // scroll i hjälp/nivåer
+    e.preventDefault();
+  }, { passive: false });
   let lastTouchEnd = 0;
   document.addEventListener('touchend', e => {
     const now = performance.now();
@@ -1093,7 +1278,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, get records() { return records; }, get maxLevel() { return maxLevel; } };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1105,6 +1290,8 @@
       minMoves: saved.minMoves ?? null, minExact: saved.minExact
     };
     if (S.minMoves == null) computeMinMoves();
+    maxLevel = Math.max(saved.maxLevel || 1, S.level);
+    records = saved.records && typeof saved.records === 'object' ? saved.records : {};
     sound = saved.sound !== false;
     musicOn = saved.music !== false;
     updateAudioButtons();

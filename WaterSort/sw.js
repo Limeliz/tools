@@ -1,9 +1,13 @@
-// Enkel offline-cache för Vattensortering
-const CACHE = 'vattensortering-v1';
+// Service worker för Vattensortering.
+// Hämtar alltid senaste versionen från nätet och går förbi webbläsarens HTTP-cache.
+// Cachen används bara när telefonen är offline.
+const CACHE = 'vattensortering-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'no-store' }))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
@@ -11,10 +15,14 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
-      .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return res; })
-      .catch(() => caches.match(e.request))
+    fetch(req, { cache: 'no-store' })
+      .then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+        return res;
+      })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html')))
   );
 });

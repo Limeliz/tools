@@ -186,8 +186,8 @@
   .help td:first-child { color: #ffd60a; white-space: nowrap; padding-right: 10px; }
   .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; max-width: 560px; margin: 0 auto; }
   .lvl {
-    aspect-ratio: 1; border-radius: 16px; background: var(--btn); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 1px; padding: 4px;
+    min-height: 72px; border-radius: 16px; background: var(--btn); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px; padding: 8px 4px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 4px 10px rgba(0,0,0,.25);
   }
   .lvl:active { transform: scale(.94); }
@@ -195,6 +195,7 @@
   .lvl .st { font-size: 11px; color: #ffd60a; letter-spacing: 1px; }
   .lvl small { font-size: 10px; opacity: .7; line-height: 1.15; }
   .lvl { gap: 0; }
+  .card .tries { margin: -12px 0 16px; font-size: 14px; opacity: .85; }
   #timer {
     position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
     font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; opacity: .8;
@@ -251,6 +252,7 @@
       <div class="stars">★★★</div>
       <h2 id="winTitle">Snyggt!</h2>
       <p id="winText">Nivå 1 klar</p>
+      <div class="tries" id="winTries"></div>
       <div class="record" id="winRecord"></div>
       <button class="bigbtn" id="btnNext">Nästa nivå</button>
       <button class="linkbtn" id="btnReplay">Spela igen</button><button class="linkbtn" id="btnWinLevels">Alla nivåer</button>
@@ -314,6 +316,9 @@
 
       <h3>Tid</h3>
       <p>Klockan högst upp på spelplanen startar när du gör din första hällning och stannar när nivån är klar. Den pausas när du lämnar appen och nollställs om du trycker på <i>Börja om</i>. Din snabbaste tid sparas för varje nivå, oavsett betyg, och visas i nivålistan och under nivånumret.</p>
+
+      <h3>Försök</h3>
+      <p>Spelet räknar hur många försök du behövde innan du klarade en nivå första gången. Ett nytt försök räknas när du trycker på <i>Börja om</i> eller lämnar nivån efter att ha gjort minst ett drag. Att ångra räknas inte. Antalet visas när du klarar nivån och i nivålistan. För nivåer du inte klarat än visar listan hur många försök du gjort hittills.</p>
 
       <h3>Spela gamla nivåer</h3>
       <p>Tryck på nivånumret uppe till vänster för att se alla nivåer du har låst upp, med ditt bästa betyg, antal drag och snabbaste tid. Tryck på en nivå för att spela den igen och försöka förbättra resultatet. Ditt bästa resultat visas under nivånumret medan du spelar. Den nivå du var mitt i startar om från början om du byter nivå.</p>
@@ -557,6 +562,7 @@
   let locked = false;        // valt rör är låst med dubbeltryck
   let extraTubes = 0;        // sparade extra rör (följer med mellan nivåer)
   let awardedLevel = 0;      // högsta nivå som gett ett extra rör
+  let attempts = {};         // ej klarade nivåer: antal avbrutna försök hittills
 
   // ---------- Tid: räknas från första hällningen tills nivån är klar (pausas när appen är i bakgrunden) ----------
   let timerStart = null;
@@ -576,7 +582,14 @@
   setInterval(showTimer, 100);
   document.addEventListener('visibilitychange', () => { if (!S) return; if (document.hidden) { timerPause(); save(); } else timerRun(); });
 
+  function abandonAttempt() {
+    if (S && S.moves > 0 && !isSolved(S.tubes) && !records[S.level])
+      attempts[S.level] = (attempts[S.level] || 0) + 1;
+  }
+  const triesText = n => n === 1 ? 'första försöket' : `${n} försök`;
+
   function newGame(level) {
+    abandonAttempt();
     // Extra rör som använts på en nivå som inte klarades lämnas tillbaka
     if (S && S.extraUsed && !isSolved(S.tubes)) extraTubes += S.extraUsed;
     const tubes = generateLevel(level);
@@ -598,7 +611,7 @@
   function save() {
     try {
       timerCommit();
-      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel };
+      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel, attempts };
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
     } catch (e) { /* ignoreras */ }
   }
@@ -1129,6 +1142,7 @@
 
   $('btnRestart').addEventListener('click', () => {
     if (anims) return;
+    abandonAttempt();
     S.tubes = clone(S.initial); S.history = [];
     extraTubes += S.extraUsed || 0; // använda extra rör lämnas tillbaka
     S.undos = UNDOS; S.hints = HINTS; S.extraUsed = 0; S.moves = 0;
@@ -1233,7 +1247,13 @@
     const faster = !prev || prev.time == null || time < prev.time;
     const rec = better ? { stars, moves: S.moves } : { stars: prev.stars, moves: prev.moves };
     rec.time = faster ? time : prev.time;
+    // antal försök sparas bara första gången nivån klaras
+    if (!prev) { rec.tries = (attempts[S.level] || 0) + 1; delete attempts[S.level]; }
+    else if (prev.tries != null) rec.tries = prev.tries;
     records[S.level] = rec;
+    $('winTries').textContent = !prev
+      ? (rec.tries === 1 ? 'Klarad på första försöket!' : `Klarad efter ${rec.tries} försök`)
+      : (rec.tries != null ? `Första gången krävdes ${triesText(rec.tries)}` : '');
     const msgs = [];
     if (prev && better) msgs.push('Nytt rekord!');
     if (prev && prev.time != null && faster) msgs.push('Ny snabbaste tid!');
@@ -1274,7 +1294,8 @@
       const b = document.createElement('button');
       b.className = 'lvl' + (L === S.level ? ' current' : '') + (!r ? ' new' : '');
       b.dataset.level = L;
-      b.innerHTML = `<b>${L}</b>` + (r ? `<span class="st">${starStr(r.stars)}</span><small>${r.moves} drag</small>` + (r.time != null ? `<small>${fmtTime(r.time)}</small>` : '') : '<small>Ny</small>');
+      b.innerHTML = `<b>${L}</b>` + (r ? `<span class="st">${starStr(r.stars)}</span><small>${r.moves} drag</small>` + (r.time != null ? `<small>${fmtTime(r.time)}</small>` : '') + (r.tries != null ? `<small>${r.tries} försök</small>` : '')
+        : '<small>Ny</small>' + (attempts[L] ? `<small>${attempts[L]} försök</small>` : ''));
       grid.appendChild(b);
     }
     $('levelsSum').textContent = `${maxLevel} nivåer upplåsta · ${stars} av ${maxLevel * 3} stjärnor · ${perfect} perfekta`;
@@ -1337,7 +1358,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; } };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; } };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1352,6 +1373,7 @@
     if (S.minMoves == null) computeMinMoves();
     maxLevel = Math.max(saved.maxLevel || 1, S.level);
     records = saved.records && typeof saved.records === 'object' ? saved.records : {};
+    attempts = saved.attempts && typeof saved.attempts === 'object' ? saved.attempts : {};
     if (saved.extraTubes == null) { // äldre sparfil: ge rören man redan skulle ha fått
       awardedLevel = Math.floor(maxLevel / TUBE_EVERY) * TUBE_EVERY;
       extraTubes = awardedLevel / TUBE_EVERY;

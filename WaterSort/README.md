@@ -26,7 +26,7 @@ Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHu
 - Häll-animation, ljud, vibration och konfetti.
 - Klarar du en nivå utan hjälp (ångra, tips, extra rör) säger spelet "Nice!". Klarar du den dessutom på minsta möjliga antal drag säger det "Perfect!". Minsta antal drag räknas fram i bakgrunden när nivån startar.
 - Lugn lo-fi-bakgrundsmusik som spelet själv komponerar och spelar upp i realtid, så den är helt fri från royalty. Musiken och ljudeffekterna stängs av med var sin knapp.
-- Tiden räknas från första hällningen tills nivån är klar. Tryck på nivånumret för att se alla upplåsta nivåer med ditt bästa betyg, antal drag, snabbaste tid och hur många försök du behövde första gången, och spela dem igen.
+- Tiden räknas från första hällningen tills nivån är klar. Tryck på nivånumret för att se alla upplåsta nivåer med ditt bästa betyg, antal drag, snabbaste tid och hur många försök du behövde första gången, och spela dem igen. Nivåer som klarats utan hjälp får en guldram.
 - Hjälpsidan (frågetecknet) förklarar regler, snabbknep, hjälpmedel och betyg.
 - Framstegen sparas automatiskt i webbläsaren.
 
@@ -34,3 +34,7 @@ Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHu
 
 - `sounds/no-help.mp3` spelas när du klarar en nivå utan hjälp (Nice!) och `sounds/perfect-score.mp3` när du klarar den på minsta antal drag (Perfect!). De är inbäddade i `index.html`, så spelet fungerar som en enda fil. Byter du ut filerna behöver de bäddas in på nytt (base64 i `VOICE_B64`).
 - Bakgrundsmusiken och övriga ljudeffekter genereras av spelet självt med Web Audio.
+
+## Versioner
+
+Se [CHANGELOG.md](CHANGELOG.md). Versionen och historiken visas också längst ned på spelets hjälpsida.

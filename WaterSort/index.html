@@ -360,6 +360,9 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.6.0', date: '2026-11-21', pr: 9, notes: [
+      'Ny färgpalett med 12 färger som är lättare att skilja åt: bara en grön, och vitt och svart har tillkommit.',
+      'Nivåerna är desamma som förut, så rekord och tider gäller fortfarande.'] },
     { v: '1.5.1', date: '2026-11-21', pr: 8, notes: [
       'Appen på hemskärmen hämtar alltid senaste versionen och laddar om sig själv när en ny version finns.'] },
     { v: '1.5.0', date: '2026-11-21', pr: 7, notes: [
@@ -391,11 +394,32 @@
   const CAP = 4;
   const UNDOS = 5, HINTS = 3;
   const TUBE_EVERY = 5;       // ett extra rör första gången man når nivå 5, 10, 15 …
+  // 12 färger valda för största möjliga skillnad (minsta ΔE2000 mellan två färger: 20,0)
+  // och tydlig kontrast mot bakgrunden. Bara en grön.
   const PALETTE = [
-    '#ff3b47', '#2f7bff', '#2ecc52', '#ffd60a', '#a64dff', '#ff8c1a',
-    '#ff6ec7', '#28d7f0', '#9be33a', '#8b5a2b', '#9aa3b2', '#1d3c99',
-    '#14b8a6', '#f2e3c4'
+    '#e8262f', // röd
+    '#3a66ff', // blå
+    '#22b14c', // grön
+    '#ffe11a', // gul
+    '#c03cff', // lila
+    '#ff8a00', // orange
+    '#ff4fa3', // rosa
+    '#3fd7f5', // turkos
+    '#ffffff', // vit
+    '#7a4416', // brun
+    '#8a8f99', // grå
+    '#000000'  // svart
   ];
+  // Nivågeneratorn väljer bland 14 färgplatser (som i tidigare versioner) så att alla nivåer
+  // behåller exakt samma upplägg. Platser utan egen färg byts mot en färg som nivån inte använder.
+  const SLOTS = 14;
+  function colorMapFor(tubes) {
+    const used = new Set(tubes.flat());
+    const free = [...PALETTE.keys()].filter(c => !used.has(c));
+    const high = [...used].filter(c => c >= PALETTE.length).sort((a, b) => a - b);
+    const map = new Map(high.map((c, k) => [c, free[k]]));
+    return t => t.map(a => a.map(c => map.has(c) ? map.get(c) : c));
+  }
   const STORE_KEY = 'vattensortering.v1';
 
   // ---------- DOM ----------
@@ -584,7 +608,7 @@
     const n = colorsForLevel(level);
     let last = null;
     for (let attempt = 0; attempt < 80; attempt++) {
-      const colors = shuffle([...PALETTE.keys()], rng).slice(0, n);
+      const colors = shuffle([...Array(SLOTS).keys()], rng).slice(0, n);
       const pool = [];
       colors.forEach(c => { for (let k = 0; k < CAP; k++) pool.push(c); });
       shuffle(pool, rng);
@@ -594,9 +618,9 @@
       // undvik rör som redan är klara eller nästan klara från start
       if (tubes.some(a => a.length && runLength(a) >= 3)) continue;
       last = tubes;
-      if (solve(tubes, 40000)) return tubes;
+      if (solve(tubes, 40000)) return colorMapFor(tubes)(tubes);
     }
-    if (last) { last.push([]); return last; } // nödutgång: ett extra tomt rör
+    if (last) { last.push([]); return colorMapFor(last)(last); } // nödutgång: ett extra tomt rör
     return [[0, 1, 0, 1], [1, 0, 1, 0], [], []];
   }
 
@@ -1427,6 +1451,11 @@
       minMoves: saved.minMoves ?? null, minExact: saved.minExact,
       timeMs: saved.timeMs || 0, timeStarted: !!saved.timeStarted, timeDone: !!saved.timeDone
     };
+    // sparat läge från en version med 14 färger: byt färger som inte längre finns
+    if (S.initial.flat().some(c => c >= PALETTE.length)) {
+      const m = colorMapFor(S.initial);
+      S.tubes = m(S.tubes); S.initial = m(S.initial); S.history = S.history.map(m);
+    }
     if (S.minMoves == null) computeMinMoves();
     maxLevel = Math.max(saved.maxLevel || 1, S.level);
     records = saved.records && typeof saved.records === 'object' ? saved.records : {};

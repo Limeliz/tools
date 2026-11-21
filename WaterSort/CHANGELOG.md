@@ -2,6 +2,9 @@
 
 Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.html` och visas längst ned på spelets hjälpsida.
 
+## 1.5.1 – 2026-11-21 (PR #8)
+- Appen på hemskärmen hämtar alltid senaste versionen och laddar om sig själv när en ny version finns.
+
 ## 1.5.0 – 2026-11-21 (PR #7)
 - Nivåer som klarats utan hjälp får en guldram i nivålistan.
 - Hjälpsidan beskriver vinstljud, tid, försök och markeringarna i nivålistan.

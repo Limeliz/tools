@@ -10,7 +10,7 @@ Ett färgsorteringspussel (vattensortering) som webbapp för mobilen. Häll fär
 python -m http.server 8000
 ```
 
-Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHub Pages) kan appen läggas till på hemskärmen och fungerar offline.
+Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHub Pages, https://limeliz.github.io/tools/WaterSort/) kan appen läggas till på hemskärmen och fungerar offline. Appen letar efter en ny version varje gång den startas eller öppnas igen och laddar då om sig själv.
 
 ## Regler
 

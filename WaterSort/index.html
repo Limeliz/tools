@@ -360,6 +360,8 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.5.1', date: '2026-11-21', pr: 8, notes: [
+      'Appen på hemskärmen hämtar alltid senaste versionen och laddar om sig själv när en ny version finns.'] },
     { v: '1.5.0', date: '2026-11-21', pr: 7, notes: [
       'Nivåer som klarats utan hjälp får en guldram i nivålistan.',
       'Hjälpsidan beskriver vinstljud, tid, försök och markeringarna i nivålistan.',
@@ -1443,7 +1445,31 @@
   }
 
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Uppdateringar: appen på hemskärmen återupptas ofta från minnet utan att laddas om.
+    // Kolla därför efter en ny version vid start och varje gång appen kommer tillbaka,
+    // och ladda om sidan när en ny version finns. Spelets läge är sparat, så inget går förlorat.
+    let swReg = null, reloading = false;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(r => { swReg = r; }).catch(() => {});
+    const reloadToUpdate = () => {
+        if (reloading) return;
+        if (anims) { setTimeout(reloadToUpdate, 500); return; }
+        reloading = true;
+        save();
+        location.reload();
+    };
+    const checkForUpdate = () => {
+        if (swReg) swReg.update().catch(() => {});
+        fetch('index.html?v=' + Date.now(), { cache: 'no-store' })
+          .then(r => r.ok ? r.text() : '')
+          .then(t => {
+            const m = t.match(/\{ v: '(\d+\.\d+\.\d+)'/);
+            if (m && m[1] !== VERSION) reloadToUpdate();
+          })
+          .catch(() => {}); // offline: fortsätt med versionen som finns
+    };
+    checkForUpdate();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
   }
 })();
 </script>

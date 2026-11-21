@@ -153,7 +153,10 @@
   <header>
     <div class="title"><small>Nivå</small><b id="level">1</b></div>
     <div class="group">
-      <button class="iconbtn" id="btnSound" aria-label="Ljud">
+      <button class="iconbtn" id="btnMusic" aria-label="Musik">
+        <svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path id="musicSlash" d="M3 3l18 18" style="display:none"/></svg>
+      </button>
+      <button class="iconbtn" id="btnSound" aria-label="Ljudeffekter">
         <svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
       </button>
       <button class="iconbtn" id="btnRestart" aria-label="Börja om">
@@ -185,7 +188,7 @@
   <div id="overlay">
     <div class="card">
       <div class="stars">★★★</div>
-      <h2>Snyggt!</h2>
+      <h2 id="winTitle">Snyggt!</h2>
       <p id="winText">Nivå 1 klar</p>
       <button class="bigbtn" id="btnNext">Nästa nivå</button>
       <button class="linkbtn" id="btnReplay">Spela nivån igen</button>
@@ -299,6 +302,90 @@
     return dfs() ? path : null;
   }
 
+  // ---------- Minsta antal drag (A*) – körs i en Web Worker när nivån startar ----------
+  // A* för minsta antal drag. h = (antal färgblock) - (antal färger), tillåten och konsistent.
+  function optimalMoves(start, limit, weight) {
+    const CAP = 4;
+    weight = weight || 1;
+    const tubes0 = start.map(a => a.map(c => String.fromCharCode(97 + c)).join(''));
+    const colors = new Set(start.flat()).size;
+    const runsOf = s => { let r = 0; for (let k = 0; k < s.length; k++) if (k === 0 || s[k] !== s[k - 1]) r++; return r; };
+    let h0 = -colors; for (const s of tubes0) h0 += runsOf(s);
+    const keyOf = t => t.slice().sort().join('|');
+    // binär heap
+    const heap = []; // [f, -g, id]
+    const push = n => { heap.push(n); let i = heap.length - 1; while (i) { const p = (i - 1) >> 1; if (less(heap[i], heap[p])) { [heap[i], heap[p]] = [heap[p], heap[i]]; i = p; } else break; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && less(heap[l], heap[m])) m = l; if (r < heap.length && less(heap[r], heap[m])) m = r; if (m === i) break; [heap[i], heap[m]] = [heap[m], heap[i]]; i = m; } } return top; };
+    function less(a, b) { return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]); }
+    const states = [], gs = [], hs = [];
+    const best = new Map();
+    states.push(tubes0); gs.push(0); hs.push(h0); best.set(keyOf(tubes0), 0);
+    push([h0 * weight, 0, 0]);
+    let expanded = 0;
+    while (heap.length) {
+      const [, , id] = pop();
+      const t = states[id], g = gs[id], h = hs[id];
+      if (h === 0) return { moves: g, exact: weight === 1, expanded };
+      if (best.get(keyOf(t)) < g) continue;
+      if (++expanded > limit) return null;
+      for (let i = 0; i < t.length; i++) {
+        const a = t[i]; if (!a) continue;
+        const c = a[a.length - 1]; let run = 1;
+        while (run < a.length && a[a.length - 1 - run] === c) run++;
+        const uniform = run === a.length;
+        if (uniform && a.length === CAP) continue;
+        let emptyDone = false;
+        for (let j = 0; j < t.length; j++) {
+          if (j === i) continue;
+          const b = t[j]; if (b.length >= CAP) continue;
+          let cnt;
+          if (!b) { if (uniform || emptyDone) continue; emptyDone = true; cnt = run; }
+          else if (b[b.length - 1] === c) cnt = Math.min(run, CAP - b.length);
+          else continue;
+          const nt = t.slice();
+          nt[i] = a.slice(0, a.length - cnt);
+          nt[j] = b + c.repeat(cnt);
+          const nh = h + (cnt === run ? -1 : 0) + (b ? 0 : 1);
+          const ng = g + 1, k = keyOf(nt);
+          const old = best.get(k);
+          if (old !== undefined && old <= ng) continue;
+          best.set(k, ng);
+          states.push(nt); gs.push(ng); hs.push(nh);
+          push([ng + nh * weight, -ng, states.length - 1]);
+        }
+      }
+    }
+    return null;
+  }
+
+  let minWorker = null;
+  function computeMinMoves() {
+    const level = S.level, tubes = S.initial;
+    S.minMoves = null;
+    const onResult = r => {
+      if (!S || S.level !== level || !r) return;
+      S.minMoves = r.moves; S.minExact = r.exact;
+      save();
+    };
+    try {
+      if (minWorker === null) {
+        const src = optimalMoves.toString() +
+          '\nonmessage = e => { const t = e.data.tubes;' +
+          ' const r = optimalMoves(t, 600000, 1) || optimalMoves(t, 600000, 1.4);' +
+          ' postMessage({ level: e.data.level, r }); };';
+        minWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+        minWorker.onerror = () => { minWorker = false; };
+      }
+      if (minWorker) {
+        minWorker.onmessage = e => { if (e.data.level === level) onResult(e.data.r); };
+        minWorker.postMessage({ level, tubes });
+        return;
+      }
+    } catch (e) { minWorker = false; }
+    // reserv utan worker: räkna direkt
+    setTimeout(() => onResult(optimalMoves(tubes, 600000, 1) || optimalMoves(tubes, 600000, 1.4)), 50);
+  }
+
   // ---------- Nivågenerering ----------
   function colorsForLevel(level) {
     return Math.min(12, 2 + Math.ceil(level / 2));
@@ -332,20 +419,22 @@
   const flying = {};        // tub-index -> true medan röret är i luften
   let pendingLayout = false;
   let sound = true;
+  let musicOn = true;
 
   function newGame(level) {
     const tubes = generateLevel(level);
     S = {
       level, tubes, initial: clone(tubes), history: [],
-      undos: UNDOS, hints: HINTS, extra: EXTRA, moves: 0
+      undos: UNDOS, hints: HINTS, extra: EXTRA, moves: 0, minMoves: null
     };
     sel = null; hintPlan = null;
+    computeMinMoves();
     save();
     layout(); render();
   }
   function save() {
     try {
-      const s = { ...S, history: S.history.slice(-UNDOS), sound };
+      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn };
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
     } catch (e) { /* ignoreras */ }
   }
@@ -360,15 +449,21 @@
   }
 
   // ---------- Ljud ----------
-  let actx = null;
-  function audio() {
-    if (!sound) return null;
+  let actx = null, sfxBus = null, musicBus = null;
+  function getCtx() {
     try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
+      if (!actx) {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        sfxBus = actx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(actx.destination);
+        const tape = actx.createBiquadFilter(); tape.type = 'lowpass'; tape.frequency.value = 3800;
+        musicBus = actx.createGain(); musicBus.gain.value = 0;
+        musicBus.connect(tape).connect(actx.destination);
+      }
+      if (actx.state === 'suspended' && !document.hidden) actx.resume();
       return actx;
     } catch (e) { return null; }
   }
+  function audio() { return sound ? getCtx() : null; }
   function tone(freq, dur, type = 'sine', vol = .15, slideTo = null, delay = 0) {
     const ctx = audio(); if (!ctx) return;
     const t0 = ctx.currentTime + delay;
@@ -378,7 +473,7 @@
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + .02);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(ctx.destination);
+    o.connect(g).connect(sfxBus);
     o.start(t0); o.stop(t0 + dur + .05);
   }
   const sfx = {
@@ -386,8 +481,208 @@
     pour: n => { for (let k = 0; k < n; k++) tone(260 + k * 70, .09, 'sine', .12, 520 + k * 90, k * .075); },
     bad: () => tone(160, .15, 'square', .05),
     done: () => { tone(660, .12, 'triangle', .12); tone(990, .2, 'triangle', .12, null, .1); },
-    win: () => [523, 659, 784, 1047].forEach((f, k) => tone(f, .3, 'triangle', .14, null, k * .12))
+    win: () => [523, 659, 784, 1047].forEach((f, k) => tone(f, .3, 'triangle', .14, null, k * .12)),
+    perfect: () => {
+      [523, 659, 784, 1047, 1319, 1568].forEach((f, k) => tone(f, .35, 'triangle', .13, null, k * .08));
+      [1047, 1319, 1568, 2093].forEach((f, k) => tone(f, .6, 'sine', .07, null, .55 + k * .05));
+    }
   };
+
+  // ---------- Röst ("Nice!" / "Perfect!") via webbläsarens talsyntes ----------
+  const speech = 'speechSynthesis' in window ? window.speechSynthesis : null;
+  let voice = null;
+  function pickVoice() {
+    if (!speech) return;
+    const vs = speech.getVoices();
+    voice = vs.find(v => /^en[-_]US/i.test(v.lang) && /Samantha|Google US|Aria|Jenny|Zira|Ava|Allison/i.test(v.name))
+      || vs.find(v => /^en[-_](US|GB)/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  }
+  if (speech) { pickVoice(); speech.addEventListener && speech.addEventListener('voiceschanged', pickVoice); }
+  function say(text, pitch = 1.2) {
+    if (!sound || !speech) return;
+    try {
+      speech.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      if (voice) u.voice = voice;
+      u.lang = voice ? voice.lang : 'en-US';
+      u.rate = 0.95; u.pitch = pitch; u.volume = 1;
+      Music.duck(1.8);
+      speech.speak(u);
+    } catch (e) {}
+  }
+
+  // ---------- Bakgrundsmusik: egenkomponerad lo-fi som spelas upp i realtid (fri från royalty) ----------
+  const Music = (() => {
+    const BPM = 72, S16 = 60 / BPM / 4, LEVEL = .6;
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+    // 8 takter: Dm9 – G13 – Cmaj9 – Am9 | Fmaj9 – Em7 – Dm9 – G13
+    const PROG = [
+      { bass: 38, keys: [53, 57, 60, 64] }, { bass: 43, keys: [53, 59, 64, 69] },
+      { bass: 36, keys: [52, 55, 59, 62] }, { bass: 45, keys: [55, 60, 64, 71] },
+      { bass: 41, keys: [57, 60, 64, 67] }, { bass: 40, keys: [55, 59, 62, 67] },
+      { bass: 38, keys: [53, 57, 60, 64] }, { bass: 43, keys: [53, 59, 64, 69] }
+    ];
+    const PENTA = [69, 72, 74, 76, 79, 81, 84];
+    let running = false, timer = 0, nextTime = 0, step = 0, noise = null, crackle = null, keysBus = null, wow = null, melody = [];
+    let duckUntil = 0;
+
+    function noiseBuffer(ctx) {
+      const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      return b;
+    }
+    function crackleBuffer(ctx) {
+      const len = ctx.sampleRate * 4, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * .012;
+        if (Math.random() < .00035) { const a = (Math.random() * .5 + .2) * (Math.random() < .5 ? -1 : 1); for (let k = 0; k < 40 && i + k < len; k++) d[i + k] += a * Math.exp(-k / 6); }
+      }
+      return b;
+    }
+    function env(g, t, peak, attack, decay) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    }
+    function keys(ctx, notes, t, dur, vel) {
+      notes.forEach((m, k) => {
+        const tt = t + k * .012; // lätt "strum"
+        const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+        o1.type = 'sine'; o2.type = 'triangle';
+        o1.frequency.value = o2.frequency.value = mtof(m);
+        o2.detune.value = 5; g2.gain.value = .25;
+        wow.connect(o1.detune); wow.connect(o2.detune);
+        o1.connect(g); o2.connect(g2).connect(g); g.connect(keysBus);
+        env(g, tt, vel, .02, dur);
+        o1.start(tt); o2.start(tt); o1.stop(tt + dur + .1); o2.stop(tt + dur + .1);
+      });
+    }
+    function bass(ctx, m, t, dur) {
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'triangle'; o.frequency.value = mtof(m);
+      f.type = 'lowpass'; f.frequency.value = 380;
+      o.connect(f).connect(g).connect(musicBus);
+      env(g, t, .32, .015, dur);
+      o.start(t); o.stop(t + dur + .1);
+    }
+    function kick(ctx, t) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(42, t + .11);
+      o.connect(g).connect(musicBus); env(g, t, .55, .005, .3);
+      o.start(t); o.stop(t + .4);
+    }
+    function snare(ctx, t) {
+      const n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      n.buffer = noise; bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = .8;
+      n.connect(bp).connect(g).connect(musicBus); env(g, t, .2, .004, .17);
+      n.start(t, Math.random()); n.stop(t + .25);
+      const o = ctx.createOscillator(), g2 = ctx.createGain();
+      o.frequency.value = 185; o.connect(g2).connect(musicBus); env(g2, t, .06, .003, .07);
+      o.start(t); o.stop(t + .12);
+    }
+    function hat(ctx, t, vel) {
+      const n = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
+      n.buffer = noise; hp.type = 'highpass'; hp.frequency.value = 7000;
+      n.connect(hp).connect(g).connect(musicBus); env(g, t, vel, .002, .04);
+      n.start(t, Math.random()); n.stop(t + .08);
+    }
+    function bell(ctx, m, t) {
+      const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+      o.frequency.value = mtof(m); o2.frequency.value = mtof(m) * 2; g2.gain.value = .15;
+      wow.connect(o.detune);
+      o.connect(g); o2.connect(g2).connect(g); g.connect(keysBus);
+      env(g, t, .07, .01, 1.3);
+      o.start(t); o2.start(t); o.stop(t + 1.5); o2.stop(t + 1.5);
+    }
+    function newMelody() {
+      melody = new Array(64).fill(0);
+      let idx = 3;
+      for (let s = 0; s < 64; s += 2) {
+        if (s % 16 === 0 || Math.random() > .2) continue;
+        idx = Math.max(0, Math.min(PENTA.length - 1, idx + Math.floor(Math.random() * 5) - 2));
+        melody[s] = PENTA[idx];
+      }
+    }
+    function play(ctx, st, t) {
+      const bar = Math.floor(st / 16) % PROG.length, s = st % 16, ch = PROG[bar];
+      const tt = t + (s % 2 ? S16 * .22 : 0); // swing
+      if (st % 128 === 0) newMelody();
+      if (s === 0) keys(ctx, ch.keys, tt, S16 * 13, .07);
+      if (s === 10) keys(ctx, ch.keys.slice(1), tt, S16 * 5, .04);
+      if (s === 0) bass(ctx, ch.bass, tt, S16 * 6);
+      if (s === 7 || (s === 10 && bar % 2)) bass(ctx, ch.bass + (s === 7 ? 0 : 7), tt, S16 * 3);
+      if (s === 0 || s === 7 || (s === 10 && bar % 2 === 1)) kick(ctx, tt);
+      if (s === 4 || s === 12) snare(ctx, tt);
+      if (s % 2 === 0) hat(ctx, tt, s % 4 === 0 ? .045 : .025);
+      if (bar >= 0 && st % 256 >= 64) { const m = melody[st % 64]; if (m) bell(ctx, m, tt); } // melodin kommer in efter 4 takter
+    }
+    function tick() {
+      const ctx = actx; if (!ctx || ctx.state !== 'running') return;
+      while (nextTime < ctx.currentTime + .2) { play(ctx, step, nextTime); nextTime += S16; step++; }
+      if (duckUntil && ctx.currentTime > duckUntil) { duckUntil = 0; musicBus.gain.setTargetAtTime(LEVEL, ctx.currentTime, .3); }
+    }
+    return {
+      start() {
+        const ctx = getCtx(); if (!ctx || running) return;
+        running = true;
+        if (!noise) {
+          noise = noiseBuffer(ctx);
+          keysBus = ctx.createBiquadFilter(); keysBus.type = 'lowpass'; keysBus.frequency.value = 1600;
+          keysBus.connect(musicBus);
+          const lfo = ctx.createOscillator(); lfo.frequency.value = .45;
+          wow = ctx.createGain(); wow.gain.value = 7; // svag "tape wow" i cent
+          lfo.connect(wow); lfo.start();
+        }
+        crackle = ctx.createBufferSource(); crackle.buffer = crackleBuffer(ctx); crackle.loop = true;
+        const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
+        const cg = ctx.createGain(); cg.gain.value = .5;
+        crackle.connect(hp).connect(cg).connect(musicBus); crackle.start();
+        step = 0; nextTime = ctx.currentTime + .1;
+        musicBus.gain.cancelScheduledValues(ctx.currentTime);
+        musicBus.gain.setValueAtTime(musicBus.gain.value, ctx.currentTime);
+        musicBus.gain.linearRampToValueAtTime(LEVEL, ctx.currentTime + 2);
+        clearInterval(timer); timer = setInterval(tick, 25); tick();
+      },
+      stop() {
+        if (!running || !actx) return;
+        running = false;
+        const ctx = actx, c = crackle;
+        musicBus.gain.cancelScheduledValues(ctx.currentTime);
+        musicBus.gain.setValueAtTime(musicBus.gain.value, ctx.currentTime);
+        musicBus.gain.linearRampToValueAtTime(0, ctx.currentTime + .4);
+        clearInterval(timer);
+        setTimeout(() => { try { c && c.stop(); } catch (e) {} }, 500);
+      },
+      duck(sec) {
+        if (!running || !actx) return;
+        musicBus.gain.setTargetAtTime(LEVEL * .3, actx.currentTime, .05);
+        duckUntil = actx.currentTime + sec;
+      },
+      get running() { return running; }
+    };
+  })();
+
+  function updateAudioButtons() {
+    $('btnSound').classList.toggle('off', !sound);
+    $('wave').style.display = sound ? '' : 'none';
+    $('btnMusic').classList.toggle('off', !musicOn);
+    $('musicSlash').style.display = musicOn ? 'none' : '';
+  }
+
+  // Ljud får bara starta efter en användarhandling (iOS och Android): lås upp vid första trycket
+  let audioUnlocked = false;
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    const ctx = getCtx(); if (!ctx) return;
+    audioUnlocked = true;
+    if (musicOn) Music.start();
+    if (speech) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speech.speak(u); } catch (e) {} }
+  }
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, unlockAudio, true));
+  document.addEventListener('visibilitychange', () => {
+    if (!actx) return;
+    if (document.hidden) actx.suspend(); else if (audioUnlocked) actx.resume();
+  });
   const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
   // ---------- Layout & rendering ----------
@@ -714,21 +1009,38 @@
     toast('Tryck på det lysande röret för att hälla');
   });
 
+  $('btnMusic').addEventListener('click', () => {
+    musicOn = !musicOn;
+    updateAudioButtons();
+    if (musicOn) Music.start(); else Music.stop();
+    save();
+  });
+
   $('btnSound').addEventListener('click', () => {
     sound = !sound;
-    $('btnSound').classList.toggle('off', !sound);
-    $('wave').style.display = sound ? '' : 'none';
+    updateAudioButtons();
+    if (!sound && speech) speech.cancel();
     save();
     if (sound) sfx.pick();
   });
 
   // ---------- Vinst ----------
   function win() {
-    sfx.win(); buzz([30, 60, 30, 60, 60]);
-    const stars = S.moves && S.undos === UNDOS && S.extra === EXTRA && S.hints === HINTS ? 3
-      : (S.hints === HINTS ? 2 : 1);
+    const noHelp = S.undos === UNDOS && S.extra === EXTRA && S.hints === HINTS;
+    if (noHelp && S.minMoves == null) { // beräkningen hann inte bli klar – räkna direkt
+      const r = optimalMoves(S.initial, 600000, 1) || optimalMoves(S.initial, 600000, 1.4);
+      if (r) S.minMoves = r.moves;
+    }
+    const perfect = noHelp && S.minMoves != null && S.moves <= S.minMoves;
+    if (perfect) { sfx.perfect(); say('Perfect!', 1.15); }
+    else if (noHelp) { sfx.win(); say('Nice!', 1.25); }
+    else sfx.win();
+    buzz(perfect ? [40, 50, 40, 50, 40, 50, 120] : [30, 60, 30, 60, 60]);
+    const stars = perfect ? 3 : noHelp ? 2 : 1;
     document.querySelector('.stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-    $('winText').textContent = `Nivå ${S.level} klar på ${S.moves} drag`;
+    $('winTitle').textContent = perfect ? 'Perfect!' : noHelp ? 'Nice!' : 'Klart!';
+    $('winText').textContent = `Nivå ${S.level} klar på ${S.moves} drag` +
+      (S.minMoves != null ? ` · minsta möjliga: ${S.minMoves}` : '');
     $('overlay').classList.add('show');
     confetti();
   }
@@ -781,7 +1093,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -789,11 +1101,13 @@
     S = {
       level: saved.level, tubes: saved.tubes, initial: saved.initial || clone(saved.tubes),
       history: saved.history || [], undos: saved.undos ?? UNDOS, hints: saved.hints ?? HINTS,
-      extra: saved.extra ?? EXTRA, moves: saved.moves || 0
+      extra: saved.extra ?? EXTRA, moves: saved.moves || 0,
+      minMoves: saved.minMoves ?? null, minExact: saved.minExact
     };
+    if (S.minMoves == null) computeMinMoves();
     sound = saved.sound !== false;
-    $('btnSound').classList.toggle('off', !sound);
-    $('wave').style.display = sound ? '' : 'none';
+    musicOn = saved.music !== false;
+    updateAudioButtons();
     layout(); render();
     if (isSolved(S.tubes)) newGame(S.level + 1);
   } else {

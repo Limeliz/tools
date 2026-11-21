@@ -23,4 +23,6 @@ Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHu
 - Oändligt många nivåer; svårigheten ökar med fler färger (upp till 12). Varje nivå kontrolleras med en lösare så att den alltid går att klara.
 - Ångra (5 per nivå), tips (3 per nivå) och ett extra rör per nivå.
 - Häll-animation, ljud, vibration och konfetti.
+- Klarar du en nivå utan hjälp (ångra, tips, extra rör) säger spelet "Nice!". Klarar du den dessutom på minsta möjliga antal drag säger det "Perfect!". Minsta antal drag räknas fram i bakgrunden när nivån startar.
+- Lugn lo-fi-bakgrundsmusik som spelet själv komponerar och spelar upp i realtid, så den är helt fri från royalty. Musiken och ljudeffekterna stängs av med var sin knapp.
 - Framstegen sparas automatiskt i webbläsaren.

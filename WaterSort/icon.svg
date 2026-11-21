@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="20%" r="90%">
+      <stop offset="0" stop-color="#3d43a0"/><stop offset="1" stop-color="#110f30"/>
+    </radialGradient>
+    <clipPath id="t1"><path d="M126 120h80v230a40 40 0 0 1-80 0z"/></clipPath>
+    <clipPath id="t2"><path d="M306 120h80v230a40 40 0 0 1-80 0z"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g clip-path="url(#t1)">
+    <rect x="126" y="310" width="80" height="80" fill="#2f7bff"/>
+    <rect x="126" y="250" width="80" height="60" fill="#ff3b47"/>
+    <rect x="126" y="190" width="80" height="60" fill="#ffd60a"/>
+  </g>
+  <g clip-path="url(#t2)">
+    <rect x="306" y="310" width="80" height="80" fill="#2ecc52"/>
+    <rect x="306" y="250" width="80" height="60" fill="#2ecc52"/>
+    <rect x="306" y="190" width="80" height="60" fill="#2ecc52"/>
+    <rect x="306" y="130" width="80" height="60" fill="#2ecc52"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="10">
+    <path d="M126 120v230a40 40 0 0 0 80 0V120"/>
+    <path d="M306 120v230a40 40 0 0 0 80 0V120"/>
+  </g>
+  <g fill="#fff" fill-opacity=".85">
+    <rect x="112" y="108" width="108" height="16" rx="8"/>
+    <rect x="292" y="108" width="108" height="16" rx="8"/>
+  </g>
+</svg>

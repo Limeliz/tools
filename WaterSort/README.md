@@ -12,6 +12,10 @@ python -m http.server 8000
 
 Gå sedan till `http://<datorns-ip>:8000/` på telefonen. Via HTTPS (t.ex. GitHub Pages, https://limeliz.github.io/tools/WaterSort/) kan appen läggas till på hemskärmen och fungerar offline. Appen letar efter en ny version varje gång den startas eller öppnas igen och laddar då om sig själv.
 
+## Testläge
+
+Lägg till `#niva-` och ett nummer i adressen för att prova en valfri nivå, till exempel `https://limeliz.github.io/tools/WaterSort/#niva-300`. I testläget sparas ingenting: dina framsteg, rekord och extra rör påverkas inte. Tryck på "TEST Avsluta" under nivånumret för att gå tillbaka.
+
 ## Regler
 
 - Tryck på ett rör för att lyfta det, tryck sedan på ett annat för att hälla.

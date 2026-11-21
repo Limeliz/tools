@@ -290,9 +290,11 @@
       </div>
       <div class="aid">
         <svg viewBox="0 0 24 24"><path d="M8 3v13a4 4 0 0 0 8 0V3"/><path d="M6 3h12"/><path d="M12 8v6M9 11h6"/></svg>
-        <div><b>Extra rör – 1 per nivå</b>Lägger till ett tomt rör som ger mer utrymme. Det finns kvar resten av nivån.</div>
+        <div><b>Extra rör – sparas mellan nivåer</b>Lägger till ett tomt rör som ger mer utrymme resten av nivån. Du börjar med 0 och får ett nytt rör första gången du når nivå 5, 10, 15 och så vidare. Rör du inte använder sparas till senare nivåer. Du kan använda upp till tre på samma nivå.</div>
       </div>
-      <p>Siffran på knappen visar hur många du har kvar. <b>Så får du fler:</b> alla hjälpmedel fylls på igen när du börjar en ny nivå, spelar en gammal nivå igen eller trycker på <i>Börja om</i> (pilen uppe till höger), som också startar om nivån från början. Det finns inget sätt att spara oanvända hjälpmedel till senare.</p>
+      <p>Siffran på knappen visar hur många du har kvar.</p>
+      <p><b>Så får du fler:</b> ångra och tips fylls på igen när du börjar en ny nivå, spelar en gammal nivå igen eller trycker på <i>Börja om</i> (pilen uppe till höger), som också startar om nivån från början. Oanvända ångringar och tips sparas inte till nästa nivå.</p>
+      <p>Ett extra rör förbrukas när du klarar nivån. Trycker du på <i>Börja om</i> eller byter nivå innan du klarat den får du tillbaka rören du använde där.</p>
 
       <h3>Betyg</h3>
       <table>
@@ -319,7 +321,8 @@
 
   // ---------- Konstanter ----------
   const CAP = 4;
-  const UNDOS = 5, HINTS = 3, EXTRA = 1;
+  const UNDOS = 5, HINTS = 3;
+  const TUBE_EVERY = 5;       // ett extra rör första gången man når nivå 5, 10, 15 …
   const PALETTE = [
     '#ff3b47', '#2f7bff', '#2ecc52', '#ffd60a', '#a64dff', '#ff8c1a',
     '#ff6ec7', '#28d7f0', '#9be33a', '#8b5a2b', '#9aa3b2', '#1d3c99',
@@ -541,22 +544,30 @@
   let maxLevel = 1;          // högsta upplåsta nivå
   let records = {};          // nivå -> { stars, moves }
   let locked = false;        // valt rör är låst med dubbeltryck
+  let extraTubes = 0;        // sparade extra rör (följer med mellan nivåer)
+  let awardedLevel = 0;      // högsta nivå som gett ett extra rör
 
   function newGame(level) {
+    // Extra rör som använts på en nivå som inte klarades lämnas tillbaka
+    if (S && S.extraUsed && !isSolved(S.tubes)) extraTubes += S.extraUsed;
     const tubes = generateLevel(level);
     S = {
       level, tubes, initial: clone(tubes), history: [],
-      undos: UNDOS, hints: HINTS, extra: EXTRA, moves: 0, minMoves: null
+      undos: UNDOS, hints: HINTS, extraUsed: 0, moves: 0, minMoves: null
     };
     sel = null; locked = false; hintPlan = null;
     maxLevel = Math.max(maxLevel, level);
+    if (level % TUBE_EVERY === 0 && level > awardedLevel) {
+      awardedLevel = level; extraTubes++;
+      setTimeout(() => { toast(`Du fick ett extra rör! Du har nu ${extraTubes}.`); sfx.done(); }, 300);
+    }
     computeMinMoves();
     save();
     layout(); render();
   }
   function save() {
     try {
-      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records };
+      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel };
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
     } catch (e) { /* ignoreras */ }
   }
@@ -871,10 +882,10 @@
     $('best').innerHTML = r ? `Bäst: <span class="st">${starStr(r.stars)}</span> ${r.moves} drag` : '';
     $('undoCount').textContent = S.undos;
     $('hintCount').textContent = S.hints;
-    $('tubeCount').textContent = S.extra;
+    $('tubeCount').textContent = extraTubes;
     $('btnUndo').classList.toggle('off', !S.undos || !S.history.length);
     $('btnHint').classList.toggle('off', !S.hints);
-    $('btnTube').classList.toggle('off', !S.extra);
+    $('btnTube').classList.toggle('off', !extraTubes);
   }
   // Ritar om en tubs innehåll från tillståndet (utan att bygga om DOM)
   function paintTube(i, tube = tubeEl(i)) {
@@ -1087,7 +1098,8 @@
   $('btnRestart').addEventListener('click', () => {
     if (anims) return;
     S.tubes = clone(S.initial); S.history = [];
-    S.undos = UNDOS; S.hints = HINTS; S.extra = EXTRA; S.moves = 0;
+    extraTubes += S.extraUsed || 0; // använda extra rör lämnas tillbaka
+    S.undos = UNDOS; S.hints = HINTS; S.extraUsed = 0; S.moves = 0;
     sel = null; locked = false; clearHint();
     layout(); render(); save();
     toast('Nivån startades om');
@@ -1095,8 +1107,13 @@
 
   $('btnTube').addEventListener('click', () => {
     if (anims) return;
-    if (!S.extra) { toast('Du har redan använt extraröret'); return; }
-    S.extra--;
+    if (!extraTubes) {
+      const next = (Math.floor(Math.max(awardedLevel, S.level) / TUBE_EVERY) + 1) * TUBE_EVERY;
+      toast(`Inga extra rör kvar. Du får ett nytt när du når nivå ${next}.`); return;
+    }
+    if (S.tubes.length >= S.initial.length + 3) { toast('Max tre extra rör per nivå'); return; }
+    extraTubes--;
+    S.extraUsed = (S.extraUsed || 0) + 1;
     S.tubes.push([]);
     S.history.forEach(h => h.push([]));
     sel = null; locked = false; clearHint();
@@ -1161,7 +1178,8 @@
 
   // ---------- Vinst ----------
   function win() {
-    const noHelp = S.undos === UNDOS && S.extra === EXTRA && S.hints === HINTS;
+    const noHelp = S.undos === UNDOS && S.hints === HINTS && S.tubes.length === S.initial.length;
+    S.extraUsed = 0; // använda extra rör är nu förbrukade
     if (noHelp && S.minMoves == null) { // beräkningen hann inte bli klar – räkna direkt
       const r = optimalMoves(S.initial, 600000, 1) || optimalMoves(S.initial, 600000, 1.4);
       if (r) S.minMoves = r.moves;
@@ -1278,7 +1296,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, get records() { return records; }, get maxLevel() { return maxLevel; } };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; } };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1286,12 +1304,16 @@
     S = {
       level: saved.level, tubes: saved.tubes, initial: saved.initial || clone(saved.tubes),
       history: saved.history || [], undos: saved.undos ?? UNDOS, hints: saved.hints ?? HINTS,
-      extra: saved.extra ?? EXTRA, moves: saved.moves || 0,
+      extraUsed: saved.extraUsed || 0, moves: saved.moves || 0,
       minMoves: saved.minMoves ?? null, minExact: saved.minExact
     };
     if (S.minMoves == null) computeMinMoves();
     maxLevel = Math.max(saved.maxLevel || 1, S.level);
     records = saved.records && typeof saved.records === 'object' ? saved.records : {};
+    if (saved.extraTubes == null) { // äldre sparfil: ge rören man redan skulle ha fått
+      awardedLevel = Math.floor(maxLevel / TUBE_EVERY) * TUBE_EVERY;
+      extraTubes = awardedLevel / TUBE_EVERY;
+    } else { extraTubes = saved.extraTubes; awardedLevel = saved.awardedLevel || 0; }
     sound = saved.sound !== false;
     musicOn = saved.music !== false;
     updateAudioButtons();

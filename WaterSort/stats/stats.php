@@ -37,6 +37,93 @@ $fmtTime = function ($ms): string {
 $local = fn($utc) => $utc ? (new DateTime($utc . ' UTC'))->setTimezone($tz)->format('Y-m-d H:i') : '–';
 $pct = fn($v) => $v === null ? '–' : round((float)$v * 100) . ' %';
 $num = fn($v, $d = 1) => $v === null ? '–' : number_format((float)$v, $d, ',', ' ');
+/** Snygga steg för y-axeln: 0 och 4–6 jämna steg upp till minst $max. */
+function nice_ticks(float $max, ?array $steps = null): array {
+    if ($max <= 0) $max = 1;
+    if ($steps) { // t.ex. jämna tidssteg i sekunder
+        $step = end($steps);
+        foreach ($steps as $c) if ($max / $c <= 5) { $step = $c; break; }
+    } else {
+        $raw = $max / 4; $mag = 10 ** floor(log10($raw)); $n = $raw / $mag;
+        $step = ($n <= 1 ? 1 : ($n <= 2 ? 2 : ($n <= 2.5 ? 2.5 : ($n <= 5 ? 5 : 10)))) * $mag;
+        if ($step < 1 && $max >= 1) $step = 1;
+    }
+    $ticks = []; for ($v = 0; $v < $max + $step * 0.001; $v += $step) $ticks[] = $v;
+    if (end($ticks) < $max) $ticks[] = end($ticks) + $step;
+    return $ticks;
+}
+
+/**
+ * Linjediagram med nivåerna längs x-axeln. $series = [[namn, css-klass, värden indexerade som $levels], ...].
+ * Saknade värden bryter linjen. Varje nivå har en osynlig kolumn med verktygstips.
+ */
+function line_chart(array $levels, array $series, callable $fmt, string $title, int $h = 220, ?array $steps = null): string {
+    $n = count($levels);
+    if ($n === 0) return '';
+    $W = 760; $padL = 56; $padR = 16; $padT = 12; $padB = 30;
+    $vals = []; foreach ($series as $sr) foreach ($sr[2] as $v) if ($v !== null) $vals[] = (float)$v;
+    $ticks = nice_ticks($vals ? max($vals) : 1, $steps); $ymax = end($ticks);
+    $iw = $W - $padL - $padR; $ih = $h - $padT - $padB;
+    $x = fn(int $i) => $padL + ($n === 1 ? $iw / 2 : $i * $iw / ($n - 1));
+    $y = fn(float $v) => $padT + $ih - $v / $ymax * $ih;
+    $o = '<figure class="chart"><figcaption>' . h($title) . '</figcaption>';
+    $o .= '<div class="wrap"><svg viewBox="0 0 ' . $W . ' ' . $h . '" role="img" aria-label="' . h($title) . '">';
+    foreach ($ticks as $t) {
+        $ty = round($y($t), 1);
+        $o .= '<line class="grid" x1="' . $padL . '" x2="' . ($W - $padR) . '" y1="' . $ty . '" y2="' . $ty . '"/>';
+        $o .= '<text class="ylab" x="' . ($padL - 8) . '" y="' . ($ty + 4) . '">' . h($fmt($t, true)) . '</text>';
+    }
+    $every = max(1, (int)ceil($n / 12));
+    foreach ($levels as $i => $lvl) if ($i % $every === 0 || ($i === $n - 1 && ($n - 1) % $every >= $every / 2)) {
+        $o .= '<text class="xlab" x="' . round($x($i), 1) . '" y="' . ($h - 8) . '">' . (int)$lvl . '</text>';
+    }
+    foreach ($series as [$name, $cls, $data]) {
+        $seg = []; $d = '';
+        foreach ($levels as $i => $lvl) {
+            $v = $data[$i] ?? null;
+            if ($v === null) { $seg = []; continue; }
+            $pt = round($x($i), 1) . ',' . round($y((float)$v), 1);
+            $d .= ($seg ? ' L' : ' M') . $pt; $seg[] = $pt;
+        }
+        if ($d !== '') $o .= '<path class="line ' . $cls . '" d="' . trim($d) . '"/>';
+        if ($n <= 60) foreach ($levels as $i => $lvl) {
+            $v = $data[$i] ?? null; if ($v === null) continue;
+            $o .= '<circle class="dot ' . $cls . '" cx="' . round($x($i), 1) . '" cy="' . round($y((float)$v), 1) . '" r="4"/>';
+        }
+    }
+    // verktygstips per nivå (hela kolumnen är träffyta)
+    $colW = $n === 1 ? $iw : $iw / ($n - 1);
+    foreach ($levels as $i => $lvl) {
+        $tip = 'Nivå ' . (int)$lvl;
+        foreach ($series as [$name, $cls, $data]) $tip .= "\n" . $name . ': ' . (($data[$i] ?? null) === null ? '–' : $fmt((float)$data[$i], false));
+        $o .= '<rect class="hit" x="' . round($x($i) - $colW / 2, 1) . '" y="' . $padT . '" width="' . round($colW, 1) . '" height="' . $ih . '"><title>' . h($tip) . '</title></rect>';
+    }
+    $o .= '<line class="axis" x1="' . $padL . '" x2="' . ($W - $padR) . '" y1="' . ($padT + $ih) . '" y2="' . ($padT + $ih) . '"/>';
+    $o .= '</svg></div><div class="legend">';
+    foreach ($series as [$name, $cls]) $o .= '<span><i class="' . $cls . '"></i>' . h($name) . '</span>';
+    return $o . '<span class="muted">Nivå →</span></div></figure>';
+}
+
+/** Graferna ovanför nivåtabellen: Tid, eller Drag och försök (två grafer med samma nivåaxel). */
+function level_charts(array $rows, callable $fmtTime): string {
+    if (!$rows) return '<p class="muted">Ingen data för de här nivåerna än.</p>';
+    $lv = array_map(fn($r) => (int)$r['level'], $rows);
+    $col = fn(string $k) => array_map(fn($r) => $r[$k] === null ? null : (float)$r[$k], $rows);
+    $sec = fn(float $v, bool $axis) => $axis ? ($v >= 60 ? sprintf('%d:%02d', intdiv((int)$v, 60), (int)$v % 60) : (int)$v . ' s') : $fmtTime($v * 1000);
+    $toSec = fn(array $a) => array_map(fn($v) => $v === null ? null : $v / 1000, $a);
+    $int = fn(float $v, bool $axis) => $axis ? (string)(int)round($v) : number_format($v, 1, ',', '');
+    $o = '<div class="charttabs">';
+    $o .= '<input type="radio" name="chart" id="ch-time" checked><label for="ch-time">Tid</label>';
+    $o .= '<input type="radio" name="chart" id="ch-moves"><label for="ch-moves">Drag och försök</label>';
+    $o .= '<div class="pane pane-time box">' . line_chart($lv, [['Snitt', 's1', $toSec($col('avgt'))], ['Snabbast', 's2', $toSec($col('bestt'))]], $sec, 'Tid per nivå (klarade nivåer)', 240,
+        [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]) . '</div>';
+    $o .= '<div class="pane pane-moves box">'
+        . line_chart($lv, [['Snitt', 's1', $col('avgm')], ['Minsta möjliga', 's2', $col('minm')]], $int, 'Antal drag', 200)
+        . line_chart($lv, [['Snitt', 's1', $col('tries')], ['Max', 's2', $col('maxtries')]], $int, 'Försök innan nivån klarades första gången', 170)
+        . '</div></div>';
+    return $o;
+}
+
 function bar(float $part, float $max): string {
     $w = $max > 0 ? max(1, round($part / $max * 100)) : 0;
     return '<span class="bar"><i style="width:' . $w . '%"></i></span>';
@@ -78,6 +165,31 @@ function bar(float $part, float $max): string {
   form.inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   form.inline input { width: 90px; } form.inline button { width: auto; margin: 0; padding: 8px 14px; }
   code { background: #2a2766; padding: 1px 5px; border-radius: 5px; }
+  /* grafer: snitt = blå, bästa/max = orange (validerade mot ytan #201d52) */
+  :root { --s1: #3987e5; --s2: #d95926; }
+  .charttabs { margin: 12px 0 14px; position: relative; }
+  .charttabs input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  .charttabs label { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #2a2766; color: var(--muted); cursor: pointer; font-weight: 600; margin: 0 6px 10px 0; }
+  .charttabs input:checked + label { background: var(--accent); color: #14123a; }
+  .charttabs input:focus-visible + label { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .pane { display: none; }
+  #ch-time:checked ~ .pane-time, #ch-moves:checked ~ .pane-moves { display: block; }
+  .chart { margin: 0 0 10px; }
+  .chart figcaption { font-weight: 600; margin: 2px 0 4px; }
+  .chart .wrap { overflow-x: auto; }
+  .chart svg { width: 100%; min-width: 560px; height: auto; display: block; }
+  .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .chart .axis { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .chart text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chart .ylab { text-anchor: end; } .chart .xlab { text-anchor: middle; }
+  .chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .chart .line.s1 { stroke: var(--s1); } .chart .line.s2 { stroke: var(--s2); }
+  .chart .dot { stroke: var(--card); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .chart .dot.s1 { fill: var(--s1); } .chart .dot.s2 { fill: var(--s2); }
+  .chart .hit { fill: transparent; } .chart .hit:hover { fill: rgba(255,255,255,.06); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--fg); margin-top: 2px; }
+  .legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .legend i.s1 { background: var(--s1); } .legend i.s2 { background: var(--s2); }
 </style></head><body><main>
 <?php if (empty($_SESSION['ok'])): ?>
   <form class="login" method="post">
@@ -213,12 +325,7 @@ function bar(float $part, float $max): string {
   ?>
   <h2>Nivåer</h2>
   <form class="inline" method="get"><span class="muted">Visa nivå</span> <input type="number" name="from" min="1" value="<?= $from ?>"> <span class="muted">till</span> <input type="number" name="to" min="1" value="<?= $to ?>"> <button>Visa</button> <span class="muted">(högsta spelade: <?= $maxLvl ?>)</span></form>
-  <p class="muted">Försök = hur många försök spelarna behövde innan de klarade nivån första gången. Hjälpmedel = andel av vinsterna där hjälpmedlet användes, och totalt antal användningar (även i avbrutna försök).
-  Nivåer som klarades före version 1.8.0 är importerade med spelarens bästa resultat: de räknas i <i>Har klarat</i>, <i>Försök</i> och <i>Bästa tid</i>, men inte i vinster, snitt eller hjälpmedel.</p>
-  <div class="box scroll"><table>
-    <tr><th>Nivå</th><th>Har spelat</th><th>Har klarat</th><th>Vinster</th><th>Avbrutna</th><th>Försök snitt</th><th>Försök max</th>
-      <th>Tid snitt</th><th>Bästa tid</th><th>Drag snitt</th><th>Minsta</th><th>Perfect</th><th>Ångra</th><th>Tips</th><th>Extra rör</th></tr>
-    <?php foreach ($all("SELECT level, COUNT(DISTINCT player_id) tried, COUNT(DISTINCT CASE WHEN type IN ('win','import') THEN player_id END) cleared,
+  <?php $levelRows = $all("SELECT level, COUNT(DISTINCT player_id) tried, COUNT(DISTINCT CASE WHEN type IN ('win','import') THEN player_id END) cleared,
         SUM(type='win') wins, SUM(type='abandon') ab,
         AVG(CASE WHEN type IN ('win','import') AND first_clear=1 THEN tries END) tries, MAX(CASE WHEN type IN ('win','import') AND first_clear=1 THEN tries END) maxtries,
         AVG(CASE WHEN type='win' THEN time_ms END) avgt, MIN(CASE WHEN type IN ('win','import') THEN time_ms END) bestt,
@@ -226,7 +333,14 @@ function bar(float $part, float $max): string {
         AVG(CASE WHEN type='win' THEN stars=3 END) perf,
         AVG(CASE WHEN type='win' THEN undos>0 END) pu, AVG(CASE WHEN type='win' THEN hints>0 END) ph, AVG(CASE WHEN type='win' THEN extra>0 END) px,
         SUM(undos) su, SUM(hints) sh, SUM(extra) sx
-        FROM events WHERE type IN ('win','abandon','import') AND level BETWEEN ? AND ? GROUP BY level ORDER BY level", [$from, $to]) as $r): ?>
+        FROM events WHERE type IN ('win','abandon','import') AND level BETWEEN ? AND ? GROUP BY level ORDER BY level", [$from, $to]);
+  echo level_charts($levelRows, $fmtTime); ?>
+  <p class="muted">Försök = hur många försök spelarna behövde innan de klarade nivån första gången. Hjälpmedel = andel av vinsterna där hjälpmedlet användes, och totalt antal användningar (även i avbrutna försök).
+  Nivåer som klarades före version 1.8.0 är importerade med spelarens bästa resultat: de räknas i <i>Har klarat</i>, <i>Försök</i> och <i>Bästa tid</i>, men inte i vinster, snitt eller hjälpmedel.</p>
+  <div class="box scroll"><table>
+    <tr><th>Nivå</th><th>Har spelat</th><th>Har klarat</th><th>Vinster</th><th>Avbrutna</th><th>Försök snitt</th><th>Försök max</th>
+      <th>Tid snitt</th><th>Bästa tid</th><th>Drag snitt</th><th>Minsta</th><th>Perfect</th><th>Ångra</th><th>Tips</th><th>Extra rör</th></tr>
+    <?php foreach ($levelRows as $r): ?>
       <tr><td><?= (int)$r['level'] ?></td><td><?= (int)$r['tried'] ?></td><td><?= (int)$r['cleared'] ?></td><td><?= (int)$r['wins'] ?></td><td><?= (int)$r['ab'] ?></td>
         <td><?= $num($r['tries']) ?></td><td><?= $r['maxtries'] ?? '–' ?></td>
         <td><?= $fmtTime($r['avgt']) ?></td><td><?= $fmtTime($r['bestt']) ?></td><td><?= $num($r['avgm']) ?></td><td><?= $r['minm'] ?? '–' ?></td>

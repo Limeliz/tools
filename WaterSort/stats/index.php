@@ -2,7 +2,10 @@
 // Tar emot statistik från Vattensortering och sparar den i MySQL.
 // Spelet skickar en POST med JSON (Content-Type: text/plain, så att webbläsaren inte behöver göra en förfrågan i förväg):
 // { "pid": "<uuid>", "v": "1.8.0", "tz": 60, "lang": "sv-SE", "sc": "standard",
-//   "events": [ { "t": "start|win|abandon", "ts": 1763800000000, "h": 21, "wd": 6, "lvl": 12, ... } ] }
+//   "events": [ { "id": "unikt-id", "t": "start|win|abandon|import", "ts": 1763800000000, "h": 21, "wd": 6, "lvl": 12, ... } ] }
+// Varje händelse har ett id. Samma id från samma spelare sparas bara en gång, så spelet kan skicka om
+// händelser som det inte fått bekräftade (t.ex. efter offline) utan att något räknas dubbelt.
+// "import" är nivåer som klarats före version 1.8.0 (bästa resultat), skickade en gång per nivå.
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 
@@ -63,31 +66,31 @@ try {
     $q->execute([$pid, gmdate('Y-m-d H:i:s', time() - 3600)]);
     if ((int)$q->fetchColumn() > 2000) done(429, ['ok' => false, 'error' => 'rate']);
 
-    $starts = 0;
-    foreach ($events as $e) if (is_array($e) && ($e['t'] ?? '') === 'start') $starts++;
+    $starts = 0; // räknas när händelserna sparats, så att omskickade starter inte räknas två gånger
 
     $db->prepare('INSERT INTO players (id, first_seen, last_seen, sessions, platform, lang, tz_offset, app_version, scheme)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                   ON DUPLICATE KEY UPDATE last_seen = VALUES(last_seen), sessions = sessions + VALUES(sessions),
                   platform = VALUES(platform), lang = COALESCE(VALUES(lang), lang), tz_offset = COALESCE(VALUES(tz_offset), tz_offset),
                   app_version = COALESCE(VALUES(app_version), app_version), scheme = COALESCE(VALUES(scheme), scheme)')
-       ->execute([$pid, $now, $now, $starts, $platform, $lang, $tz, $version, $scheme]);
+       ->execute([$pid, $now, $now, 0, $platform, $lang, $tz, $version, $scheme]);
 
-    $ins = $db->prepare('INSERT INTO events (player_id, type, created_at, local_hour, local_weekday, level, moves, min_moves, time_ms,
+    $ins = $db->prepare('INSERT IGNORE INTO events (player_id, eid, type, created_at, local_hour, local_weekday, level, moves, min_moves, time_ms,
                          stars, undos, hints, extra, tries, first_clear, already_cleared, scheme, app_version)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $n = 0;
     $db->beginTransaction();
     foreach ($events as $e) {
         if (!is_array($e)) continue;
         $type = $e['t'] ?? '';
-        if (!in_array($type, ['start', 'win', 'abandon'], true)) continue;
+        if (!in_array($type, ['start', 'win', 'abandon', 'import'], true)) continue;
+        $eid = isset($e['id']) && is_string($e['id']) && preg_match('/^[A-Za-z0-9-]{1,24}$/', $e['id']) ? $e['id'] : null;
         // Händelser som legat i kö (t.ex. offline) får sin egen tid om den är rimlig
         $ts = $int($e['ts'] ?? null, 0, PHP_INT_MAX);
         $when = ($ts !== null && $ts / 1000 > time() - 30 * 86400 && $ts / 1000 < time() + 300) ? gmdate('Y-m-d H:i:s', intdiv($ts, 1000)) : $now;
         $bool = fn($k) => array_key_exists($k, $e) && $e[$k] !== null ? (int)(bool)$e[$k] : null;
         $ins->execute([
-            $pid, $type, $when,
+            $pid, $eid, $type, $when,
             $int($e['h'] ?? null, 0, 23), $int($e['wd'] ?? null, 0, 6),
             $int($e['lvl'] ?? null, 1, 1000000), $int($e['mv'] ?? null, 0, 65535), $int($e['min'] ?? null, 0, 65535),
             $int($e['ms'] ?? null, 0, 4000000000), $int($e['st'] ?? null, 0, 3),
@@ -95,9 +98,12 @@ try {
             $int($e['tr'] ?? null, 1, 65535), $bool('fc'), $bool('cl'),
             $str($e['sc'] ?? $scheme, 16), $version,
         ]);
-        $n++;
+        $added = $ins->rowCount(); // 0 om händelsen redan fanns
+        $n += $added;
+        if ($added && $type === 'start') $starts++;
     }
     $db->commit();
+    if ($starts) $db->prepare('UPDATE players SET sessions = sessions + ? WHERE id = ?')->execute([$starts, $pid]);
 
     // Land och ort: högst en uppslagning per spelare och dygn
     if ($starts > 0) {

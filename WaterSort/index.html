@@ -387,6 +387,8 @@
   const VERSIONS = [
     { v: '1.8.0', date: '2026-11-22', pr: 11, notes: [
       'Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.',
+      'Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.',
+      'Statistik som samlats offline sparas i webbläsaren och skickas när spelaren är online igen.',
       'Statistiken kan stängas av på hjälpsidan.'] },
     { v: '1.7.0', date: '2026-11-21', pr: 10, notes: [
       'Välj färgschema på hjälpsidan: Standard, Paired (ColorBrewer Paired-12) eller Original från version 1.0.'] },
@@ -729,15 +731,34 @@
       return id;
     } catch (e) { return null; }
   }
+  // Kön sparas i webbläsaren. Varje händelse har ett eget id och tas bort först när servern har
+  // bekräftat den; servern ignorerar id som den redan har. Inget försvinner alltså offline,
+  // och inget räknas två gånger.
+  const STATS_QUEUE_MAX = 3000;
+  const BACKFILL_KEY = 'vattensortering.statsBackfill';
   function statsQueue() { try { return JSON.parse(localStorage.getItem(STATSQ_KEY) || '[]'); } catch (e) { return []; } }
-  function setStatsQueue(q) { try { localStorage.setItem(STATSQ_KEY, JSON.stringify(q.slice(-300))); } catch (e) {} }
-  function track(type, data = {}) {
+  function setStatsQueue(q) { try { localStorage.setItem(STATSQ_KEY, JSON.stringify(q.slice(-STATS_QUEUE_MAX))); } catch (e) {} }
+  const eventId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  function track(type, data = {}, id = eventId()) {
     if (!statsActive()) return;
     const d = new Date();
     const q = statsQueue();
-    q.push({ t: type, ts: d.getTime(), h: d.getHours(), wd: d.getDay(), sc: schemeId, ...data });
+    if (q.some(e => e.id === id)) return;
+    q.push({ id, t: type, ts: d.getTime(), h: d.getHours(), wd: d.getDay(), sc: schemeId, ...data });
     setStatsQueue(q);
     clearTimeout(track.timer); track.timer = setTimeout(flushStats, 1500);
+  }
+  // Första gången den här versionen körs: skicka alla nivåer som redan klarats (bästa resultat,
+  // tid och försök) som "import". De får fasta id, så de kan bara sparas en gång per nivå.
+  function backfillStats() {
+    if (!statsActive()) return;
+    try { if (localStorage.getItem(BACKFILL_KEY)) return; } catch (e) { return; }
+    for (const [lvl, r] of Object.entries(records)) {
+      if (!r) continue;
+      track('import', { lvl: +lvl, mv: r.moves ?? null, ms: r.time ?? null, st: r.stars ?? null,
+        tr: r.tries ?? null, fc: true, h: null, wd: null }, 'imp-' + lvl);
+    }
+    try { localStorage.setItem(BACKFILL_KEY, String(Date.now())); } catch (e) {}
   }
   function statsBody(events) {
     return JSON.stringify({ pid: playerId(), v: VERSION, tz: -new Date().getTimezoneOffset(),
@@ -746,21 +767,28 @@
   let flushing = false;
   function flushStats(useBeacon) {
     if (!statsActive() || flushing || !playerId()) return;
+    if (navigator.onLine === false) return; // offline: kön ligger kvar till nästa gång
     const q = statsQueue(); if (!q.length) return;
     const batch = q.slice(0, 100), body = statsBody(batch);
-    const drop = () => setStatsQueue(statsQueue().slice(batch.length));
-    if (useBeacon && navigator.sendBeacon) {
-      // när appen stängs: skicka med sendBeacon och räkna det som skickat
-      if (navigator.sendBeacon(STATS_URL, new Blob([body], { type: 'text/plain' }))) drop();
+    if (useBeacon === true) {
+      // när appen stängs: skicka med sendBeacon, men behåll kön tills servern bekräftat via fetch
+      if (navigator.sendBeacon) navigator.sendBeacon(STATS_URL, new Blob([body], { type: 'text/plain' }));
       return;
     }
     flushing = true;
+    const sent = new Set(batch.map(e => e.id));
     fetch(STATS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true })
-      .then(r => { if (r.ok) { drop(); if (statsQueue().length) setTimeout(flushStats, 500); } })
-      .catch(() => {}) // offline: försök igen senare
+      .then(r => r.ok ? r.json() : null)
+      .then(res => {
+        if (!res || !res.ok) return;
+        setStatsQueue(statsQueue().filter(e => !sent.has(e.id)));
+        if (statsQueue().length) setTimeout(flushStats, 300);
+      })
+      .catch(() => {}) // offline eller serverfel: försök igen senare
       .finally(() => { flushing = false; });
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushStats(true); else flushStats(); });
+  window.addEventListener('online', () => flushStats());
   const aidsUsed = () => ({ u: UNDOS - S.undos, hi: HINTS - S.hints, x: Math.max(0, S.tubes.length - S.initial.length) });
   function trackAbandon() {
     if (!S || !S.moves || isSolved(S.tubes)) return;
@@ -1589,7 +1617,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; }, statsQueue, flushStats, playerId };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; }, statsQueue, flushStats, playerId, backfillStats };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1628,6 +1656,7 @@
 
   // en start per webbläsarsession (inte vid omladdning för uppdatering)
   try { if (!sessionStorage.getItem('vs-started')) { sessionStorage.setItem('vs-started', '1'); track('start'); } } catch (e) { track('start'); }
+  backfillStats();
   flushStats();
 
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

@@ -113,11 +113,11 @@ function bar(float $part, float $max): string {
   </div>
   <h2>Nivåer</h2>
   <div class="box scroll"><table>
-    <tr><th>Nivå</th><th>Försök till första klarning</th><th>Vinster</th><th>Avbrutna</th><th>Bästa tid</th><th>Bästa drag</th><th>Minsta möjliga</th><th>Bästa betyg</th><th>Ångra</th><th>Tips</th><th>Extra rör</th></tr>
-    <?php foreach ($all("SELECT level, MAX(CASE WHEN type='win' AND first_clear=1 THEN tries END) tries, SUM(type='win') wins, SUM(type='abandon') ab,
-        MIN(CASE WHEN type='win' THEN time_ms END) best, MIN(CASE WHEN type='win' THEN moves END) mv, MIN(min_moves) mn, MAX(stars) st,
-        SUM(undos) u, SUM(hints) hi, SUM(extra) x FROM events WHERE player_id = ? AND type IN ('win','abandon') GROUP BY level ORDER BY level", [$player]) as $r): ?>
-      <tr><td><?= (int)$r['level'] ?></td><td><?= $r['tries'] ?? '–' ?></td><td><?= (int)$r['wins'] ?></td><td><?= (int)$r['ab'] ?></td>
+    <tr><th>Nivå</th><th>Försök till första klarning</th><th>Importerad</th><th>Vinster</th><th>Avbrutna</th><th>Bästa tid</th><th>Bästa drag</th><th>Minsta möjliga</th><th>Bästa betyg</th><th>Ångra</th><th>Tips</th><th>Extra rör</th></tr>
+    <?php foreach ($all("SELECT level, MAX(CASE WHEN type IN ('win','import') AND first_clear=1 THEN tries END) tries, SUM(type='import') imp, SUM(type='win') wins, SUM(type='abandon') ab,
+        MIN(CASE WHEN type IN ('win','import') THEN time_ms END) best, MIN(CASE WHEN type IN ('win','import') THEN moves END) mv, MIN(min_moves) mn, MAX(stars) st,
+        SUM(undos) u, SUM(hints) hi, SUM(extra) x FROM events WHERE player_id = ? AND type IN ('win','abandon','import') GROUP BY level ORDER BY level", [$player]) as $r): ?>
+      <tr><td><?= (int)$r['level'] ?></td><td><?= $r['tries'] ?? '–' ?></td><td><?= $r['imp'] ? 'ja' : '' ?></td><td><?= (int)$r['wins'] ?></td><td><?= (int)$r['ab'] ?></td>
         <td><?= $fmtTime($r['best']) ?></td><td><?= $r['mv'] ?? '–' ?></td><td><?= $r['mn'] ?? '–' ?></td>
         <td style="color:var(--gold)"><?= $r['st'] !== null ? str_repeat('★', (int)$r['st']) . str_repeat('☆', 3 - (int)$r['st']) : '–' ?></td>
         <td><?= (int)$r['u'] ?></td><td><?= (int)$r['hi'] ?></td><td><?= (int)$r['x'] ?></td></tr>
@@ -132,6 +132,7 @@ function bar(float $part, float $max): string {
   $sessions = (int)$one('SELECT COALESCE(SUM(sessions),0) FROM players');
   $wins = (int)$one("SELECT COUNT(*) FROM events WHERE type='win'");
   $abandons = (int)$one("SELECT COUNT(*) FROM events WHERE type='abandon'");
+  $imports = (int)$one("SELECT COUNT(*) FROM events WHERE type='import'");
   $playMs = (int)$one("SELECT COALESCE(SUM(time_ms),0) FROM events WHERE type IN ('win','abandon')");
 ?>
   <h2>Översikt</h2>
@@ -143,6 +144,7 @@ function bar(float $part, float $max): string {
     <div class="tile"><b><?= $sessions ?></b><span>starter av spelet</span></div>
     <div class="tile"><b><?= $wins ?></b><span>klarade nivåer</span></div>
     <div class="tile"><b><?= $abandons ?></b><span>avbrutna försök</span></div>
+    <div class="tile"><b><?= $imports ?></b><span>importerade nivåer (klarade före 1.8.0)</span></div>
     <div class="tile"><b><?= $num($playMs / 3600000) ?> h</b><span>speltid (mätt)</span></div>
   </div>
 
@@ -211,19 +213,20 @@ function bar(float $part, float $max): string {
   ?>
   <h2>Nivåer</h2>
   <form class="inline" method="get"><span class="muted">Visa nivå</span> <input type="number" name="from" min="1" value="<?= $from ?>"> <span class="muted">till</span> <input type="number" name="to" min="1" value="<?= $to ?>"> <button>Visa</button> <span class="muted">(högsta spelade: <?= $maxLvl ?>)</span></form>
-  <p class="muted">Försök = hur många försök spelarna behövde innan de klarade nivån första gången. Hjälpmedel = andel av vinsterna där hjälpmedlet användes, och totalt antal användningar (även i avbrutna försök).</p>
+  <p class="muted">Försök = hur många försök spelarna behövde innan de klarade nivån första gången. Hjälpmedel = andel av vinsterna där hjälpmedlet användes, och totalt antal användningar (även i avbrutna försök).
+  Nivåer som klarades före version 1.8.0 är importerade med spelarens bästa resultat: de räknas i <i>Har klarat</i>, <i>Försök</i> och <i>Bästa tid</i>, men inte i vinster, snitt eller hjälpmedel.</p>
   <div class="box scroll"><table>
     <tr><th>Nivå</th><th>Har spelat</th><th>Har klarat</th><th>Vinster</th><th>Avbrutna</th><th>Försök snitt</th><th>Försök max</th>
       <th>Tid snitt</th><th>Bästa tid</th><th>Drag snitt</th><th>Minsta</th><th>Perfect</th><th>Ångra</th><th>Tips</th><th>Extra rör</th></tr>
-    <?php foreach ($all("SELECT level, COUNT(DISTINCT player_id) tried, COUNT(DISTINCT CASE WHEN type='win' THEN player_id END) cleared,
+    <?php foreach ($all("SELECT level, COUNT(DISTINCT player_id) tried, COUNT(DISTINCT CASE WHEN type IN ('win','import') THEN player_id END) cleared,
         SUM(type='win') wins, SUM(type='abandon') ab,
-        AVG(CASE WHEN type='win' AND first_clear=1 THEN tries END) tries, MAX(CASE WHEN type='win' AND first_clear=1 THEN tries END) maxtries,
-        AVG(CASE WHEN type='win' THEN time_ms END) avgt, MIN(CASE WHEN type='win' THEN time_ms END) bestt,
+        AVG(CASE WHEN type IN ('win','import') AND first_clear=1 THEN tries END) tries, MAX(CASE WHEN type IN ('win','import') AND first_clear=1 THEN tries END) maxtries,
+        AVG(CASE WHEN type='win' THEN time_ms END) avgt, MIN(CASE WHEN type IN ('win','import') THEN time_ms END) bestt,
         AVG(CASE WHEN type='win' THEN moves END) avgm, MIN(min_moves) minm,
         AVG(CASE WHEN type='win' THEN stars=3 END) perf,
         AVG(CASE WHEN type='win' THEN undos>0 END) pu, AVG(CASE WHEN type='win' THEN hints>0 END) ph, AVG(CASE WHEN type='win' THEN extra>0 END) px,
         SUM(undos) su, SUM(hints) sh, SUM(extra) sx
-        FROM events WHERE type IN ('win','abandon') AND level BETWEEN ? AND ? GROUP BY level ORDER BY level", [$from, $to]) as $r): ?>
+        FROM events WHERE type IN ('win','abandon','import') AND level BETWEEN ? AND ? GROUP BY level ORDER BY level", [$from, $to]) as $r): ?>
       <tr><td><?= (int)$r['level'] ?></td><td><?= (int)$r['tried'] ?></td><td><?= (int)$r['cleared'] ?></td><td><?= (int)$r['wins'] ?></td><td><?= (int)$r['ab'] ?></td>
         <td><?= $num($r['tries']) ?></td><td><?= $r['maxtries'] ?? '–' ?></td>
         <td><?= $fmtTime($r['avgt']) ?></td><td><?= $fmtTime($r['bestt']) ?></td><td><?= $num($r['avgm']) ?></td><td><?= $r['minm'] ?? '–' ?></td>
@@ -238,7 +241,7 @@ function bar(float $part, float $max): string {
   <div class="box scroll"><table>
     <tr><th>Spelare</th><th>Land</th><th>Ort</th><th>Plattform</th><th>Starter</th><th>Högsta klarade</th><th>Vinster</th><th>Speltid</th><th>Första gången</th><th>Senast</th></tr>
     <?php foreach ($all("SELECT p.*, s.maxlvl, s.wins, s.ms FROM players p LEFT JOIN (
-        SELECT player_id, MAX(CASE WHEN type='win' THEN level END) maxlvl, SUM(type='win') wins, SUM(time_ms) ms FROM events GROUP BY player_id
+        SELECT player_id, MAX(CASE WHEN type IN ('win','import') THEN level END) maxlvl, SUM(type='win') wins, SUM(time_ms) ms FROM events GROUP BY player_id
       ) s ON s.player_id = p.id ORDER BY p.last_seen DESC LIMIT 50") as $r): ?>
       <tr><td class="l"><a href="?player=<?= h($r['id']) ?>"><code><?= h(substr($r['id'], 0, 8)) ?></code></a></td>
         <td class="l"><?= h($r['country'] ?? $r['country_code'] ?? '–') ?></td><td class="l"><?= h($r['city'] ?? '–') ?></td>

@@ -41,6 +41,8 @@ if ($cfg) {
     try {
         $db = vs_db();
         foreach (vs_schema() as $sql) $db->exec($sql);
+        $migrated = vs_migrate($db);
+        if ($migrated) echo '<p class="ok">Uppdaterade tabellerna: ' . h(implode(', ', $migrated)) . '.</p>';
         $tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
         echo '<p class="ok">Anslutningen fungerar. Tabellerna finns: ' . h(implode(', ', $tables)) . '.</p>';
         $players = (int)$db->query('SELECT COUNT(*) FROM players')->fetchColumn();

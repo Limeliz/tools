@@ -63,6 +63,7 @@ function vs_schema(): array {
         "CREATE TABLE IF NOT EXISTS events (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             player_id CHAR(36) NOT NULL,
+            eid VARCHAR(24) NULL,
             type VARCHAR(12) NOT NULL,
             created_at DATETIME NOT NULL,
             local_hour TINYINT UNSIGNED NULL,
@@ -80,7 +81,19 @@ function vs_schema(): array {
             already_cleared TINYINT(1) NULL,
             scheme VARCHAR(16) NULL,
             app_version VARCHAR(16) NULL,
-            INDEX (type, level), INDEX (player_id), INDEX (created_at)
+            INDEX (type, level), INDEX (player_id), INDEX (created_at),
+            UNIQUE KEY player_event (player_id, eid)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
     ];
+}
+
+/** Uppdateringar av tabeller som skapades av en tidigare version. Körs av setup.php. */
+function vs_migrate(PDO $db): array {
+    $done = [];
+    $cols = $db->query("SHOW COLUMNS FROM events")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('eid', $cols, true)) {
+        $db->exec("ALTER TABLE events ADD COLUMN eid VARCHAR(24) NULL AFTER player_id, ADD UNIQUE KEY player_event (player_id, eid)");
+        $done[] = 'events.eid';
+    }
+    return $done;
 }

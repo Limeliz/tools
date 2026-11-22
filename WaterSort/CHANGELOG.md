@@ -4,6 +4,8 @@ Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.h
 
 ## 1.8.0 – 2026-11-22 (PR #11)
 - Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.
+- Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.
+- Statistik som samlats offline sparas i webbläsaren och skickas när spelaren är online igen.
 - Statistiken kan stängas av på hjälpsidan.
 - PHP-skript för statistikservern i `stats/`.
 

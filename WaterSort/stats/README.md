@@ -33,7 +33,7 @@ Tänkt att ligga på `https://stats.filidutt.se/vattensort/`.
 
 ## Vad som samlas in
 
-Spelet skickar händelser när det startar, när en nivå klaras och när ett försök avbryts (Börja om eller byte av nivå efter minst ett drag):
+Spelet skickar händelser när det startar, när en nivå klaras och när ett försök avbryts, och en gång sina tidigare klarade nivåer (Börja om eller byte av nivå efter minst ett drag):
 
 - **Spelar-ID:** ett slumpat UUID som skapas i webbläsaren och sparas i `localStorage`. Två enheter i samma nätverk blir alltså två olika spelare. Rensar man webbläsarens data får enheten ett nytt ID.
 - **Klockslag och veckodag** i spelarens lokala tid, och tidszon.
@@ -43,4 +43,8 @@ Spelet skickar händelser när det startar, när en nivå klaras och när ett f�
 
 Spelaren kan stänga av statistiken på spelets hjälpsida. I testläget (`#niva-N`) och i förhandsvisningar skickas inget.
 
-Händelserna läggs i en kö i webbläsaren och skickas samlat, så inget försvinner om telefonen är offline. Servern tar emot högst 200 händelser per anrop och högst 2000 per spelare och timme.
+Händelserna läggs i en kö i webbläsaren (`localStorage`) och tas bort först när servern har bekräftat dem. Spelar någon offline skickas allt nästa gång spelet startar, en nivå klaras eller telefonen kommer online. Varje händelse har ett eget id, och servern sparar samma id från samma spelare bara en gång (`INSERT IGNORE` på `player_id, eid`), så omskickade händelser räknas aldrig dubbelt. Servern tar emot högst 200 händelser per anrop och högst 2000 per spelare och timme.
+
+**Tidigare resultat:** första gången en spelare kör version 1.8.0 eller senare skickas alla nivåer som redan klarats, som händelsetypen `import`. De innehåller spelarens bästa betyg, drag, tid och antal försök. De räknas i *Har klarat*, *Försök* och *Bästa tid*, men inte i vinster, snitt eller tid på dygnet, eftersom det inte går att veta när de spelades.
+
+**Uppgradering:** har du redan kört `setup.php` med en tidigare version, kör den igen. Den lägger då till kolumnen `eid` i `events`.

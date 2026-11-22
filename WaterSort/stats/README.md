@@ -6,7 +6,7 @@ Tänkt att ligga på `https://stats.filidutt.se/vattensort/`.
 | Fil | Vad den gör |
 |---|---|
 | `index.php` | Tar emot händelser från spelet (POST) och sparar dem. |
-| `stats.php` | Visar statistiken. Kräver inloggning. |
+| `stats.php` | Visar statistiken med grafer per nivå (tid, drag och försök). Kräver inloggning. |
 | `setup.php` | Skapar tabellerna och hjälper dig skapa lösenordet. **Ta bort efter installationen.** |
 | `lib.php` | Gemensam kod (anslutning, tabeller). |
 | `config.example.php` | Mall för inställningarna. |

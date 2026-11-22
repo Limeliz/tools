@@ -362,7 +362,7 @@
       <p>Not-knappen stänger av eller sätter på bakgrundsmusiken. Högtalarknappen stänger av eller sätter på ljudeffekterna och vinstljuden. Musiken startar när du rör skärmen första gången, pausas när du lämnar appen och sänks medan ett vinstljud spelas.</p>
 
       <h3>Statistik</h3>
-      <p>Spelet skickar anonym statistik så att vi kan se hur många som spelar, när, ungefär varifrån och hur svåra nivåerna är: när du startar spelet, klarar en nivå eller börjar om. Varje enhet får ett slumpat spelar-ID. Inga namn, ingen e-post och ingen IP-adress sparas. I testläget skickas inget.</p>
+      <p>Spelet skickar anonym statistik när du startar spelet, klarar en nivå eller börjar om. Den används främst för att upptäcka hur svåra nivåerna är, till exempel hur många försök, drag och hur lång tid de brukar ta, så att nivåer som är för svåra eller för lätta kan justeras. Den visar också hur många som spelar, när och ungefär varifrån. Varje enhet får ett slumpat spelar-ID. Inga namn, ingen e-post och ingen IP-adress sparas. I testläget skickas inget.</p>
       <p><button class="stat-toggle" id="btnStats"></button></p>
       <p class="muted-small" id="playerIdText"></p>
 
@@ -385,6 +385,9 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.8.1', date: '2026-11-22', pr: 12, notes: [
+      'Hjälpsidan förklarar att statistiken används för att upptäcka nivåernas svårighetsgrad, så att de kan justeras.',
+      'Statistiksidan har grafer per nivå: tid (snitt och snabbast) samt drag och försök.'] },
     { v: '1.8.0', date: '2026-11-22', pr: 11, notes: [
       'Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.',
       'Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.',

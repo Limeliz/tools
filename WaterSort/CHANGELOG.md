@@ -2,6 +2,10 @@
 
 Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.html` och visas längst ned på spelets hjälpsida.
 
+## 1.8.1 – 2026-11-22 (PR #12)
+- Hjälpsidan förklarar att statistiken används för att upptäcka nivåernas svårighetsgrad, så att de kan justeras.
+- Statistiksidan har grafer per nivå: tid (snitt och snabbast) samt drag och försök.
+
 ## 1.8.0 – 2026-11-22 (PR #11)
 - Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.
 - Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.

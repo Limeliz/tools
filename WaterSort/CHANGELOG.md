@@ -2,6 +2,10 @@
 
 Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.html` och visas längst ned på spelets hjälpsida.
 
+## 1.8.2 – 2026-11-22 (PR #14)
+- Rättat: framsteg kunde försvinna när spelet var öppet på två ställen, t.ex. i appen och i en webbläsarflik.
+- Klarade nivåer sparas även i en separat säkerhetskopia, och saknade nivåer hämtas från statistikservern.
+
 ## 1.8.1 – 2026-11-22 (PR #12)
 - Hjälpsidan förklarar att statistiken används för att upptäcka nivåernas svårighetsgrad, så att de kan justeras.
 - Statistiksidan har grafer per nivå: tid (snitt och snabbast) samt drag och försök.

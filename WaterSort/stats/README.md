@@ -6,6 +6,7 @@ Tänkt att ligga på `https://stats.filidutt.se/vattensort/`.
 | Fil | Vad den gör |
 |---|---|
 | `index.php` | Tar emot händelser från spelet (POST) och sparar dem. |
+| `restore.php` | Skickar tillbaka en spelares klarade nivåer, så att spelet kan återställa framsteg som försvunnit. |
 | `stats.php` | Visar statistiken med grafer per nivå (tid, drag och försök). Kräver inloggning. |
 | `setup.php` | Skapar tabellerna och hjälper dig skapa lösenordet. **Ta bort efter installationen.** |
 | `lib.php` | Gemensam kod (anslutning, tabeller). |
@@ -15,7 +16,7 @@ Tänkt att ligga på `https://stats.filidutt.se/vattensort/`.
 ## Installation
 
 1. **Skapa en databas och en användare** i webbhotellets kontrollpanel, t.ex. databasen `vattensort` och en användare som bara har rättigheter till den databasen.
-2. **Ladda upp** `index.php`, `stats.php`, `setup.php`, `lib.php` och `.htaccess` till `/vattensort/` på servern.
+2. **Ladda upp** `index.php`, `restore.php`, `stats.php`, `setup.php`, `lib.php` och `.htaccess` till `/vattensort/` på servern.
 3. **Skapa inställningsfilen** från `config.example.php` och fyll i databasens uppgifter. Lägg den på något av de här ställena (de prövas i den ordningen):
    1. `vattensort-config.php` **två mappnivåer upp** från `/vattensort/`. Det är oftast utanför webbroten, och det är bäst.
    2. `vattensort-config.php` en mappnivå upp (i webbroten).
@@ -23,6 +24,10 @@ Tänkt att ligga på `https://stats.filidutt.se/vattensort/`.
 4. **Öppna `https://stats.filidutt.se/vattensort/setup.php`.** Sidan kontrollerar inställningarna och skapar tabellerna. Skriv ett lösenord i formuläret, kopiera hashen den visar och klistra in den som `'admin_password_hash'` i inställningsfilen.
 5. **Ta bort `setup.php`** från servern.
 6. **Logga in** på `https://stats.filidutt.se/vattensort/stats.php`.
+
+## Återställning av framsteg
+
+Spelet frågar `restore.php?pid=<spelar-id>` en gång per session om servern har klarade nivåer som saknas i webbläsaren, och lägger i så fall till dem (bästa betyg, drag, tid och försök). Den tar aldrig bort något. Svaret innehåller bara nivåresultat, och spelar-ID:t är ett slumpat UUID som bara finns i spelarens webbläsare. Spelare som stängt av statistiken frågar aldrig servern.
 
 ## Hålla lösenord borta från GitHub
 

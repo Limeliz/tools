@@ -385,6 +385,9 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.8.2', date: '2026-11-22', pr: 14, notes: [
+      'Rättat: framsteg kunde försvinna när spelet var öppet på två ställen, t.ex. i appen och i en webbläsarflik.',
+      'Klarade nivåer sparas även i en separat säkerhetskopia, och saknade nivåer hämtas från statistikservern.'] },
     { v: '1.8.1', date: '2026-11-22', pr: 12, notes: [
       'Hjälpsidan förklarar att statistiken används för att upptäcka nivåernas svårighetsgrad, så att de kan justeras.',
       'Statistiksidan har grafer per nivå: tid (snitt och snabbast) samt drag och försök.'] },
@@ -826,13 +829,81 @@
     save();
     layout(); render();
   }
+  // ---------- Sparande som tål flera öppna kopior ----------
+  // Spelet kan vara öppet på flera ställen samtidigt (appen på hemskärmen och en flik i webbläsaren).
+  // Varje sparning får ett löpnummer (rev). En kopia som ser att någon annan har sparat något nyare
+  // skriver inte över det, utan laddar om och fortsätter med det nyare läget.
+  // Framstegen (klarade nivåer m.m.) sparas dessutom separat och slås ihop vid start, så att de aldrig
+  // kan gå bakåt, inte ens om en äldre version av spelet skriver över sparfilen.
+  const PROGRESS_KEY = 'vattensortering.progress';
+  let saveRev = 0, staleReload = false;
+  // En kopia skriver ingenting förrän spelaren faktiskt har rört den. Då kan en flik som laddas
+  // eller ligger i bakgrunden aldrig skriva över det som spelas någon annanstans.
+  let userActed = false;
+  ['pointerdown', 'keydown', 'click'].forEach(t => document.addEventListener(t, () => {
+    if (!userActed) { userActed = true; if (!staleReload) save(); }
+  }, true));
+  function storedRev() {
+    try { const r = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); return (r && r.rev) || 0; } catch (e) { return 0; }
+  }
+  function adoptNewerSave() {
+    if (staleReload) return;
+    staleReload = true;
+    // Ta med de egna framstegen: de slås ihop med det nyare läget efter omladdningen
+    try { localStorage.setItem(PROGRESS_KEY + '.pending', JSON.stringify({ maxLevel, records, attempts, extraTubes, awardedLevel })); } catch (e) {}
+    const go = () => anims ? setTimeout(go, 300) : location.reload();
+    go();
+  }
   function save() {
-    if (testMode) return; // testläget sparar ingenting
+    if (testMode || staleReload || !userActed) return; // testläget sparar ingenting
     try {
+      const cur = storedRev();
+      if (cur > saveRev) { adoptNewerSave(); return; } // en annan kopia har sparat nyare framsteg
       timerCommit();
-      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel, attempts };
+      saveRev = cur + 1;
+      const s = { ...S, history: S.history.slice(-UNDOS), sound, music: musicOn, maxLevel, records, extraTubes, awardedLevel, attempts, rev: saveRev };
       localStorage.setItem(STORE_KEY, JSON.stringify(s));
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({ maxLevel, records, attempts, extraTubes, awardedLevel }));
     } catch (e) { /* ignoreras */ }
+  }
+  window.addEventListener('storage', e => {
+    // en annan kopia har sparat: hämta det nya läget direkt om vi syns, annars när vi blir synliga
+    if (e.key === STORE_KEY && !testMode && !document.hidden && storedRev() > saveRev) adoptNewerSave();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !testMode && storedRev() > saveRev) adoptNewerSave();
+  });
+
+  // Slår ihop två resultat för samma nivå: bästa betyg/drag, snabbaste tid, försök och guldram behålls.
+  function mergeRecord(a, b) {
+    if (!a) return b; if (!b) return a;
+    const best = (b.stars > a.stars || (b.stars === a.stars && b.moves < a.moves)) ? b : a;
+    const r = { stars: best.stars, moves: best.moves };
+    const times = [a.time, b.time].filter(t => t != null);
+    if (times.length) r.time = Math.min(...times);
+    const tries = a.tries ?? b.tries;
+    if (tries != null) r.tries = tries;
+    if (a.clean || b.clean) r.clean = true;
+    return r;
+  }
+  /** Lägger till framsteg från en annan källa. Tar aldrig bort något. Returnerar true om något ändrades. */
+  function mergeProgress(p) {
+    if (!p || typeof p !== 'object') return false;
+    let changed = false;
+    if ((+p.maxLevel || 0) > maxLevel) { maxLevel = +p.maxLevel; changed = true; }
+    for (const [k, r] of Object.entries(p.records || {})) {
+      if (!r || typeof r.stars !== 'number') continue;
+      const m = mergeRecord(records[k], r), o = records[k];
+      if (!o || ['stars', 'moves', 'time', 'tries', 'clean'].some(f => (m[f] ?? null) !== (o[f] ?? null))) { records[k] = m; changed = true; }
+    }
+    for (const [k, n] of Object.entries(p.attempts || {})) {
+      if (!records[k] && n > (attempts[k] || 0)) { attempts[k] = n; changed = true; }
+    }
+    for (const k of Object.keys(attempts)) if (records[k]) delete attempts[k];
+    if ((+p.awardedLevel || 0) > awardedLevel) {
+      awardedLevel = +p.awardedLevel; extraTubes = Math.max(extraTubes, +p.extraTubes || 0); changed = true;
+    }
+    return changed;
   }
   function load() {
     try {
@@ -1620,7 +1691,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; }, statsQueue, flushStats, playerId, backfillStats };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; }, statsQueue, flushStats, playerId, backfillStats, mergeProgress, get saveRev() { return saveRev; } };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1645,6 +1716,7 @@
       awardedLevel = Math.floor(maxLevel / TUBE_EVERY) * TUBE_EVERY;
       extraTubes = awardedLevel / TUBE_EVERY;
     } else { extraTubes = saved.extraTubes; awardedLevel = saved.awardedLevel || 0; }
+    saveRev = saved.rev || 0;
     sound = saved.sound !== false;
     musicOn = saved.music !== false;
     updateAudioButtons();
@@ -1656,6 +1728,34 @@
   } else {
     newGame(1);
   }
+
+  // Säkerhetskopian av framstegen kan innehålla nivåer som sparfilen har tappat
+  if (!testMode) {
+    let backup = null, pending = null;
+    try { backup = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
+    try { pending = JSON.parse(localStorage.getItem(PROGRESS_KEY + '.pending') || 'null'); localStorage.removeItem(PROGRESS_KEY + '.pending'); } catch (e) {}
+    const a = mergeProgress(backup), b = mergeProgress(pending);
+    if (a || b) progressRestored('Dina framsteg är återställda');
+  }
+  function progressRestored(msg) {
+    // Står spelaren på en tidigare nivå utan att ha börjat, gå vidare till högsta upplåsta nivån
+    if (S && S.level < maxLevel && S.moves === 0 && records[S.level] && !anims) newGame(maxLevel);
+    else { save(); updateHud(); }
+    // Säkerhetskopian är en sammanslagning (tar aldrig bort något) och kan därför sparas direkt
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ maxLevel, records, attempts, extraTubes, awardedLevel })); } catch (e) {}
+    toast(`${msg} (till nivå ${maxLevel - 1}).`);
+  }
+
+  // Hämta framsteg från statistikservern en gång per session, om det finns nivåer där som saknas här
+  (function restoreFromServer() {
+    if (!statsActive() || !playerId()) return;
+    try { if (sessionStorage.getItem('vs-restored')) return; sessionStorage.setItem('vs-restored', '1'); } catch (e) {}
+    const url = new URL('restore.php', STATS_URL); url.searchParams.set('pid', playerId());
+    fetch(url, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.ok && mergeProgress({ maxLevel: d.maxLevel, records: d.records })) progressRestored('Framsteg hämtade från servern'); })
+      .catch(() => {});
+  })();
 
   // en start per webbläsarsession (inte vid omladdning för uppdatering)
   try { if (!sessionStorage.getItem('vs-started')) { sessionStorage.setItem('vs-started', '1'); track('start'); } } catch (e) { track('start'); }

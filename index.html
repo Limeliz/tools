@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1d1b4a">
-<title>Limeliz tools</title>
-<meta name="description" content="Vattensortering – ett lugnt färgsorteringspussel för mobilen, och andra små verktyg.">
+<title>Vattensortering</title>
+<meta name="description" content="Vattensortering – ett lugnt färgsorteringspussel för mobilen.">
 <link rel="icon" href="WaterSort/icon.svg" type="image/svg+xml">
 <style>
   /* Samma mörka tema som spelet: djupblå radial bakgrund, glasrör och spelets färger. */
@@ -30,8 +30,7 @@
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px));
   }
-  header { max-width: 720px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 14px 0 0; }
-  .brand { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; opacity: .65; font-weight: 700; }
+  header { max-width: 720px; margin: 0 auto; display: flex; justify-content: flex-end; align-items: center; padding: 14px 0 0; }
   .iconbtn {
     width: 46px; height: 46px; border-radius: 15px; border: none; background: var(--btn); color: #fff;
     display: grid; place-items: center; cursor: pointer;
@@ -84,7 +83,6 @@
 </head>
 <body>
   <header>
-    <span class="brand">Limeliz tools</span>
     <button class="iconbtn" id="btnMusic" aria-label="Musik av/på">
       <svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path id="musicSlash" d="M3 3l18 18" style="display:none"/></svg>
     </button>
@@ -116,7 +114,6 @@
   </main>
 
   <footer>
-    <p>Fler små verktyg finns i <a href="https://github.com/Limeliz/tools">repot på GitHub</a>.</p>
     <p class="music-note" id="musicNote">Musiken startar när du rör skärmen.</p>
   </footer>
 

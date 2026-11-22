@@ -2,6 +2,13 @@
 
 Varje pull request får en ny version. Samma lista finns i `VERSIONS` i `index.html` och visas längst ned på spelets hjälpsida.
 
+## 1.8.0 – 2026-11-22 (PR #11)
+- Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.
+- Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.
+- Statistik som samlats offline sparas i webbläsaren och skickas när spelaren är online igen.
+- Statistiken kan stängas av på hjälpsidan.
+- PHP-skript för statistikservern i `stats/`.
+
 ## 1.7.0 – 2026-11-21 (PR #10)
 - Välj färgschema på hjälpsidan: Standard, Paired (ColorBrewer Paired-12) eller Original från version 1.0.
 

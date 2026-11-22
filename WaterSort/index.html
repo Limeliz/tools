@@ -210,6 +210,9 @@
   .lvl.gold { border-color: #ffd60a; background: linear-gradient(160deg, rgba(255,214,10,.22), rgba(255,255,255,.08)); }
   .lvl.gold:not(.current) { box-shadow: 0 0 14px rgba(255,214,10,.4), 0 4px 10px rgba(0,0,0,.25); }
   .help .version { opacity: .8; }
+  .stat-toggle { background: var(--btn); color: #fff; padding: 9px 14px; border-radius: 12px; font-weight: 700; }
+  .stat-toggle.on { box-shadow: inset 0 0 0 2px #5ee7ff; }
+  .help .muted-small { font-size: 12px; opacity: .6; }
   .schemes { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
   .scheme {
     display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; text-align: left;
@@ -358,6 +361,11 @@
       <h3>Ljud och musik</h3>
       <p>Not-knappen stänger av eller sätter på bakgrundsmusiken. Högtalarknappen stänger av eller sätter på ljudeffekterna och vinstljuden. Musiken startar när du rör skärmen första gången, pausas när du lämnar appen och sänks medan ett vinstljud spelas.</p>
 
+      <h3>Statistik</h3>
+      <p>Spelet skickar anonym statistik så att vi kan se hur många som spelar, när, ungefär varifrån och hur svåra nivåerna är: när du startar spelet, klarar en nivå eller börjar om. Varje enhet får ett slumpat spelar-ID. Inga namn, ingen e-post och ingen IP-adress sparas. I testläget skickas inget.</p>
+      <p><button class="stat-toggle" id="btnStats"></button></p>
+      <p class="muted-small" id="playerIdText"></p>
+
       <h3>Sparat</h3>
       <p>Allt sparas automatiskt i webbläsaren på den här enheten: nivån du spelar, upplåsta nivåer, dina bästa resultat, snabbaste tider, försök, guldramar, sparade extra rör och ljudinställningar. Rensar du webbläsarens data försvinner det.</p>
 
@@ -377,6 +385,11 @@
   // ---------- Version ----------
   // Lägg till en ny post överst för varje pull request (och uppdatera CHANGELOG.md).
   const VERSIONS = [
+    { v: '1.8.0', date: '2026-11-22', pr: 11, notes: [
+      'Anonym statistik: varje enhet får ett slumpat spelar-ID och spelet skickar start, klarade nivåer och avbrutna försök till statistikservern.',
+      'Tidigare klarade nivåer (bästa resultat, tid och försök) skickas en gång när den nya versionen startar.',
+      'Statistik som samlats offline sparas i webbläsaren och skickas när spelaren är online igen.',
+      'Statistiken kan stängas av på hjälpsidan.'] },
     { v: '1.7.0', date: '2026-11-21', pr: 10, notes: [
       'Välj färgschema på hjälpsidan: Standard, Paired (ColorBrewer Paired-12) eller Original från version 1.0.'] },
     { v: '1.6.0', date: '2026-11-21', pr: 9, notes: [
@@ -689,8 +702,102 @@
     if (/^#niva-\d+$/.test(location.hash) || testMode) location.reload();
   });
 
+  // ---------- Anonym statistik ----------
+  // Varje webbläsare får ett slumpat spelar-ID (UUID) som sparas lokalt. Spelet skickar händelser
+  // (start, klarad nivå, avbrutet försök) till statistikservern. Inga personuppgifter skickas.
+  // Händelserna läggs i en kö som sparas, så inget går förlorat om telefonen är offline.
+  const STATS_DEFAULT_URL = 'https://stats.filidutt.se/vattensort/';
+  const PLAYER_KEY = 'vattensortering.player', STATSQ_KEY = 'vattensortering.statsq', STATSOPT_KEY = 'vattensortering.stats';
+  const DEBUG = /[?&]debug\b/.test(location.search);
+  const STATS_URL = (DEBUG && new URLSearchParams(location.search).get('statsurl')) || STATS_DEFAULT_URL;
+  let statsAllowed = true;
+  try { statsAllowed = localStorage.getItem(STATSOPT_KEY) !== 'off'; } catch (e) {}
+  // Skickas bara från den riktiga sajten (https), aldrig i testläget eller i förhandsvisningar.
+  const statsActive = () => statsAllowed && !testMode &&
+    ((location.protocol === 'https:' && !/claude/i.test(location.hostname)) || (DEBUG && STATS_URL !== STATS_DEFAULT_URL));
+  function newUuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const x = [...b].map(v => v.toString(16).padStart(2, '0')).join('');
+    return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
+  }
+  function playerId() {
+    try {
+      let id = localStorage.getItem(PLAYER_KEY);
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id || '')) {
+        id = newUuid(); localStorage.setItem(PLAYER_KEY, id);
+      }
+      return id;
+    } catch (e) { return null; }
+  }
+  // Kön sparas i webbläsaren. Varje händelse har ett eget id och tas bort först när servern har
+  // bekräftat den; servern ignorerar id som den redan har. Inget försvinner alltså offline,
+  // och inget räknas två gånger.
+  const STATS_QUEUE_MAX = 3000;
+  const BACKFILL_KEY = 'vattensortering.statsBackfill';
+  function statsQueue() { try { return JSON.parse(localStorage.getItem(STATSQ_KEY) || '[]'); } catch (e) { return []; } }
+  function setStatsQueue(q) { try { localStorage.setItem(STATSQ_KEY, JSON.stringify(q.slice(-STATS_QUEUE_MAX))); } catch (e) {} }
+  const eventId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  function track(type, data = {}, id = eventId()) {
+    if (!statsActive()) return;
+    const d = new Date();
+    const q = statsQueue();
+    if (q.some(e => e.id === id)) return;
+    q.push({ id, t: type, ts: d.getTime(), h: d.getHours(), wd: d.getDay(), sc: schemeId, ...data });
+    setStatsQueue(q);
+    clearTimeout(track.timer); track.timer = setTimeout(flushStats, 1500);
+  }
+  // Första gången den här versionen körs: skicka alla nivåer som redan klarats (bästa resultat,
+  // tid och försök) som "import". De får fasta id, så de kan bara sparas en gång per nivå.
+  function backfillStats() {
+    if (!statsActive()) return;
+    try { if (localStorage.getItem(BACKFILL_KEY)) return; } catch (e) { return; }
+    for (const [lvl, r] of Object.entries(records)) {
+      if (!r) continue;
+      track('import', { lvl: +lvl, mv: r.moves ?? null, ms: r.time ?? null, st: r.stars ?? null,
+        tr: r.tries ?? null, fc: true, h: null, wd: null }, 'imp-' + lvl);
+    }
+    try { localStorage.setItem(BACKFILL_KEY, String(Date.now())); } catch (e) {}
+  }
+  function statsBody(events) {
+    return JSON.stringify({ pid: playerId(), v: VERSION, tz: -new Date().getTimezoneOffset(),
+      lang: (navigator.language || '').slice(0, 16), sc: schemeId, events });
+  }
+  let flushing = false;
+  function flushStats(useBeacon) {
+    if (!statsActive() || flushing || !playerId()) return;
+    if (navigator.onLine === false) return; // offline: kön ligger kvar till nästa gång
+    const q = statsQueue(); if (!q.length) return;
+    const batch = q.slice(0, 100), body = statsBody(batch);
+    if (useBeacon === true) {
+      // när appen stängs: skicka med sendBeacon, men behåll kön tills servern bekräftat via fetch
+      if (navigator.sendBeacon) navigator.sendBeacon(STATS_URL, new Blob([body], { type: 'text/plain' }));
+      return;
+    }
+    flushing = true;
+    const sent = new Set(batch.map(e => e.id));
+    fetch(STATS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true })
+      .then(r => r.ok ? r.json() : null)
+      .then(res => {
+        if (!res || !res.ok) return;
+        setStatsQueue(statsQueue().filter(e => !sent.has(e.id)));
+        if (statsQueue().length) setTimeout(flushStats, 300);
+      })
+      .catch(() => {}) // offline eller serverfel: försök igen senare
+      .finally(() => { flushing = false; });
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushStats(true); else flushStats(); });
+  window.addEventListener('online', () => flushStats());
+  const aidsUsed = () => ({ u: UNDOS - S.undos, hi: HINTS - S.hints, x: Math.max(0, S.tubes.length - S.initial.length) });
+  function trackAbandon() {
+    if (!S || !S.moves || isSolved(S.tubes)) return;
+    track('abandon', { lvl: S.level, mv: S.moves, ms: Math.round(timeNow()), cl: !!records[S.level], ...aidsUsed() });
+  }
+
   function abandonAttempt() {
     if (testMode) return;
+    trackAbandon();
     if (S && S.moves > 0 && !isSolved(S.tubes) && !records[S.level])
       attempts[S.level] = (attempts[S.level] || 0) + 1;
   }
@@ -1378,6 +1485,8 @@
       if (prev && prev.time != null && !faster) msgs.push(`Snabbast: ${fmtTime(prev.time)}`);
       $('winRecord').textContent = msgs.join(' · ');
       maxLevel = Math.max(maxLevel, S.level + 1);
+      track('win', { lvl: S.level, mv: S.moves, min: S.minMoves, ms: time, st: stars,
+        tr: !prev ? rec.tries : null, fc: !prev, ...aidsUsed() });
     }
     save(); updateHud();
     $('overlay').classList.add('show');
@@ -1439,6 +1548,19 @@
       `<small>${x.desc}</small></button>`).join('');
   }
   renderSchemes();
+  function renderStatsToggle() {
+    $('btnStats').textContent = statsAllowed ? 'Skicka anonym statistik: På' : 'Skicka anonym statistik: Av';
+    $('btnStats').classList.toggle('on', statsAllowed);
+    const id = playerId();
+    $('playerIdText').textContent = id ? `Ditt spelar-ID: ${id.slice(0, 8)}` : '';
+  }
+  renderStatsToggle();
+  $('btnStats').addEventListener('click', () => {
+    statsAllowed = !statsAllowed;
+    try { localStorage.setItem(STATSOPT_KEY, statsAllowed ? 'on' : 'off'); } catch (e) {}
+    if (!statsAllowed) setStatsQueue([]);
+    renderStatsToggle();
+  });
   $('schemeList').addEventListener('click', e => {
     const b = e.target.closest('.scheme'); if (!b || anims) return;
     schemeId = b.dataset.scheme;
@@ -1495,7 +1617,7 @@
   }, { passive: false });
 
   // ---------- Start ----------
-  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; } };
+  if (/[?&]debug\b/.test(location.search)) window.__game = { get S() { return S; }, solve, generateLevel, newGame, optimalMoves, Music, playVoice, get voiceReady() { return Object.keys(voiceBuf).filter(k => typeof voiceBuf[k] === 'object'); }, get records() { return records; }, get maxLevel() { return maxLevel; }, get extraTubes() { return extraTubes; }, get attempts() { return attempts; }, statsQueue, flushStats, playerId, backfillStats };
   window.addEventListener('resize', () => { if (anims) pendingLayout = true; else { layout(); render(); } });
 
   const saved = load();
@@ -1531,6 +1653,11 @@
   } else {
     newGame(1);
   }
+
+  // en start per webbläsarsession (inte vid omladdning för uppdatering)
+  try { if (!sessionStorage.getItem('vs-started')) { sessionStorage.setItem('vs-started', '1'); track('start'); } } catch (e) { track('start'); }
+  backfillStats();
+  flushStats();
 
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     // Uppdateringar: appen på hemskärmen återupptas ofta från minnet utan att laddas om.

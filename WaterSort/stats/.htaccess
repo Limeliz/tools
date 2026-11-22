@@ -1,0 +1,13 @@
+# Visa inte innehållet i mappen
+Options -Indexes
+
+# Extra skydd: inställningar och gemensam kod ska aldrig kunna hämtas direkt
+<FilesMatch "^(config\.php|config\.example\.php|vattensort-config\.php|lib\.php|README\.md|\.gitignore)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

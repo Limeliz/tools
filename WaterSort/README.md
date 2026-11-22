@@ -34,6 +34,10 @@ Lägg till `#niva-` och ett nummer i adressen för att prova en valfri nivå, ti
 - Hjälpsidan (frågetecknet) förklarar regler, snabbknep, hjälpmedel och betyg. Där väljer du också färgschema: Standard, Paired (ColorBrewer Paired-12) eller Original.
 - Framstegen sparas automatiskt i webbläsaren.
 
+## Statistik
+
+Spelet skickar anonym statistik till `https://stats.filidutt.se/vattensort/` (går att stänga av på hjälpsidan). Serverns PHP-filer och installationsinstruktioner finns i [stats/](stats/README.md).
+
 ## Ljud
 
 - `sounds/no-help.mp3` spelas när du klarar en nivå utan hjälp (Nice!) och `sounds/perfect-score.mp3` när du klarar den på minsta antal drag (Perfect!). De är inbäddade i `index.html`, så spelet fungerar som en enda fil. Byter du ut filerna behöver de bäddas in på nytt (base64 i `VOICE_B64`).
